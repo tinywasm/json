@@ -51,3 +51,9 @@ For build instructions and detailed benchmarking information, see [benchmarks/RE
 **Standard Library JSON (119 KB):**
 ![Stdlib JSON Benchmark](benchmarks/screenshots/wasm-jsonstlib.png)
 
+---
+## [Contributing](https://github.com/cdvelop/cdvelop/blob/main/CONTRIBUTING.md)
+
+## License
+
+See [LICENSE](LICENSE) for details.
