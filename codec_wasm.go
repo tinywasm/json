@@ -69,12 +69,47 @@ func ConvertJSToGo(jsVal js.Value, v any) error {
 	case *bool:
 		*ptr = jsVal.Bool()
 	default:
-		// Use reflection to handle pointers to structs
+		// Use reflection to handle pointers to slices and structs
 		val := reflect.ValueOf(v)
 		if val.Kind() != reflect.Ptr || val.IsNil() {
 			return nil // Or error
 		}
 		elem := val.Elem()
+
+		// Handle slices of any type
+		if elem.Kind() == reflect.Slice {
+			if !jsVal.InstanceOf(js.Global().Get("Array")) {
+				return nil // Not an array
+			}
+
+			length := jsVal.Length()
+			sliceType := elem.Type()
+			elemType := sliceType.Elem()
+
+			// Create new slice with correct capacity
+			newSlice := reflect.MakeSlice(sliceType, length, length)
+
+			for i := 0; i < length; i++ {
+				jsItem := jsVal.Index(i)
+
+				// Create new element of the correct type
+				newElem := reflect.New(elemType)
+
+				// Recursively decode into the new element
+				if err := ConvertJSToGo(jsItem, newElem.Interface()); err != nil {
+					return err
+				}
+
+				// Set the decoded value into the slice
+				newSlice.Index(i).Set(newElem.Elem())
+			}
+
+			// Set the new slice to the target
+			elem.Set(newSlice)
+			return nil
+		}
+
+		// Handle structs
 		if elem.Kind() == reflect.Struct {
 			typ := elem.Type()
 			for i := 0; i < elem.NumField(); i++ {

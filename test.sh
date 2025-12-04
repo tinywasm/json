@@ -3,7 +3,7 @@
 echo "=========================================="
 echo "Running Stdlib Tests..."
 echo "=========================================="
-go test -v ./...
+go test -v $(go list ./... | grep -v '/benchmarks/')
 
 if [ $? -ne 0 ]; then
     echo "❌ Stdlib tests failed"

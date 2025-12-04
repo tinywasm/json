@@ -1,4 +1,4 @@
-//go:build wasm,stlib
+//go:build wasm
 
 package main
 

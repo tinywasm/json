@@ -113,4 +113,25 @@ func DecodeShared(t *testing.T, j *tinyjson.TinyJSON) {
 			t.Errorf("Expected %+v, got %+v", expected, result)
 		}
 	})
+
+	t.Run("Decode Slice of Structs", func(t *testing.T) {
+		input := `[{"name":"Alice","age":30},{"name":"Bob","age":25}]`
+		var result []TestStruct
+		err := j.Decode([]byte(input), &result)
+		if err != nil {
+			t.Fatalf("Decode failed: %v", err)
+		}
+
+		if len(result) != 2 {
+			t.Errorf("Expected 2 structs, got %d", len(result))
+		}
+
+		if len(result) > 0 && result[0].Name != "Alice" {
+			t.Errorf("Expected first name 'Alice', got '%s'", result[0].Name)
+		}
+
+		if len(result) > 1 && result[1].Name != "Bob" {
+			t.Errorf("Expected second name 'Bob', got '%s'", result[1].Name)
+		}
+	})
 }
