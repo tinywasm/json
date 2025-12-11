@@ -1,10 +1,10 @@
-package tinyjson_test
+package json
 
 import (
 	"reflect"
 	"testing"
 
-	"github.com/cdvelop/tinyjson"
+	"github.com/tinywasm/json"
 )
 
 type TestStruct struct {
@@ -12,7 +12,7 @@ type TestStruct struct {
 	Age  int    `json:"age"`
 }
 
-func EncodeShared(t *testing.T, j *tinyjson.TinyJSON) {
+func EncodeShared(t *testing.T, j *json.TinyJSON) {
 	t.Run("Encode String", func(t *testing.T) {
 		input := "hello"
 		expected := `"hello"`
@@ -76,7 +76,7 @@ func EncodeShared(t *testing.T, j *tinyjson.TinyJSON) {
 	})
 }
 
-func DecodeShared(t *testing.T, j *tinyjson.TinyJSON) {
+func DecodeShared(t *testing.T, j *json.TinyJSON) {
 	t.Run("Decode String", func(t *testing.T) {
 		input := `"world"`
 		var result string

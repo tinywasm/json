@@ -8,7 +8,7 @@ A lightweight JSON wrapper for Go that optimizes WebAssembly binary size. It aut
 package main
 
 import (
-    "github.com/cdvelop/tinyjson"
+    "github.com/tinywasm/json"
 )
 
 func main() {
@@ -52,7 +52,7 @@ For build instructions and detailed benchmarking information, see [benchmarks/RE
 ![Stdlib JSON Benchmark](benchmarks/screenshots/wasm-jsonstlib.png)
 
 ---
-## [Contributing](https://github.com/cdvelop/cdvelop/blob/main/CONTRIBUTING.md)
+## [Contributing](https://github.com/tinywasm/cdvelop/blob/main/CONTRIBUTING.md)
 
 ## License
 

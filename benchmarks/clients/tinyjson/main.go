@@ -5,7 +5,7 @@ package main
 import (
 	"syscall/js"
 
-	"github.com/cdvelop/tinyjson"
+	"github.com/tinywasm/json"
 )
 
 type User struct {
@@ -26,7 +26,7 @@ func main() {
 	body.Call("appendChild", h1)
 
 	// Initialize TinyJSON
-	j := tinyjson.New()
+	j := json.New()
 
 	// 1. Encode Example
 	user := User{

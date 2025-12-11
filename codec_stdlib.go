@@ -1,6 +1,6 @@
 //go:build !wasm
 
-package tinyjson
+package json
 
 import "encoding/json"
 

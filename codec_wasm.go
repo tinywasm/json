@@ -1,12 +1,12 @@
 //go:build wasm
 
-package tinyjson
+package json
 
 import (
 	"reflect"
 	"syscall/js"
 
-	. "github.com/cdvelop/tinystring"
+	. "github.com/tinywasm/fmt"
 )
 
 func getJSONCodec() codec {

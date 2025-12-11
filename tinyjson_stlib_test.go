@@ -1,15 +1,15 @@
 //go:build !wasm
 
-package tinyjson_test
+package json
 
 import (
 	"testing"
 
-	"github.com/cdvelop/tinyjson"
+	"github.com/tinywasm/json"
 )
 
 func TestStdlib(t *testing.T) {
-	j := tinyjson.New()
+	j := json.New()
 
 	t.Run("Encode", func(t *testing.T) { EncodeShared(t, j) })
 	t.Run("Decode", func(t *testing.T) { DecodeShared(t, j) })

@@ -1,4 +1,4 @@
-package tinyjson
+package json
 
 type codec interface {
 	Encode(data any) ([]byte, error)

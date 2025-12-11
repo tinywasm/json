@@ -1,12 +1,12 @@
 //go:build wasm
 
-package tinyjson_test
+package json
 
 import (
 	"encoding/json"
 	"testing"
 
-	"github.com/cdvelop/tinyjson"
+	"github.com/tinywasm/json"
 )
 
 type BenchStruct struct {
@@ -37,7 +37,7 @@ var benchJSON = []byte(`{"id":12345,"name":"John Doe","email":"john.doe@example.
 
 // TinyJSON Benchmarks
 func BenchmarkTinyJSON_Encode(b *testing.B) {
-	tj := tinyjson.New()
+	tj := json.New()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_, err := tj.Encode(benchData)
@@ -48,7 +48,7 @@ func BenchmarkTinyJSON_Encode(b *testing.B) {
 }
 
 func BenchmarkTinyJSON_Decode(b *testing.B) {
-	tj := tinyjson.New()
+	tj := json.New()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		var result BenchStruct
@@ -60,7 +60,7 @@ func BenchmarkTinyJSON_Decode(b *testing.B) {
 }
 
 func BenchmarkTinyJSON_EncodeDecode(b *testing.B) {
-	tj := tinyjson.New()
+	tj := json.New()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		encoded, err := tj.Encode(benchData)
