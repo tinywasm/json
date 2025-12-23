@@ -22,11 +22,8 @@ func main() {
 	body := document.Get("body")
 
 	h1 := document.Call("createElement", "h1")
-	h1.Set("innerHTML", "TinyJSON WASM Example")
+	h1.Set("innerHTML", "JSON WASM Example")
 	body.Call("appendChild", h1)
-
-	// Initialize TinyJSON
-	j := json.New()
 
 	// 1. Encode Example
 	user := User{
@@ -35,7 +32,8 @@ func main() {
 		Age:   30,
 	}
 
-	jsonData, err := j.Encode(user)
+	var jsonData []byte
+	err := json.Encode(user, &jsonData)
 	if err != nil {
 		console.Call("error", "Encode error:", err.Error())
 		return
@@ -48,7 +46,7 @@ func main() {
 
 	// 2. Decode Example
 	var decodedUser User
-	err = j.Decode(jsonData, &decodedUser)
+	err = json.Decode(jsonData, &decodedUser)
 	if err != nil {
 		console.Call("error", "Decode error:", err.Error())
 		return
@@ -61,7 +59,7 @@ func main() {
 	p2.Set("innerHTML", info)
 	body.Call("appendChild", p2)
 
-	console.Call("log", "TinyJSON example finished successfully")
+	console.Call("log", "JSON example finished successfully")
 
 	select {}
 }

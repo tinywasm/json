@@ -12,11 +12,12 @@ type TestStruct struct {
 	Age  int    `json:"age"`
 }
 
-func EncodeShared(t *testing.T, j *json.JSON) {
+func EncodeShared(t *testing.T) {
 	t.Run("Encode String", func(t *testing.T) {
 		input := "hello"
 		expected := `"hello"`
-		result, err := j.Encode(input)
+		var result []byte
+		err := json.Encode(input, &result)
 		if err != nil {
 			t.Fatalf("Encode failed: %v", err)
 		}
@@ -28,7 +29,8 @@ func EncodeShared(t *testing.T, j *json.JSON) {
 	t.Run("Encode Int", func(t *testing.T) {
 		input := 123
 		expected := "123"
-		result, err := j.Encode(input)
+		var result []byte
+		err := json.Encode(input, &result)
 		if err != nil {
 			t.Fatalf("Encode failed: %v", err)
 		}
@@ -39,10 +41,8 @@ func EncodeShared(t *testing.T, j *json.JSON) {
 
 	t.Run("Encode Struct", func(t *testing.T) {
 		input := TestStruct{Name: "Alice", Age: 30}
-		// JSON key order is not guaranteed, so we might need to check fields or use a more robust comparison if strict string match fails often.
-		// For simple structs in standard json, it's usually consistent, but let's see.
-		// Actually, for this simple case, let's just check if it contains the keys and values.
-		result, err := j.Encode(input)
+		var result []byte
+		err := json.Encode(input, &result)
 		if err != nil {
 			t.Fatalf("Encode failed: %v", err)
 		}
@@ -57,7 +57,8 @@ func EncodeShared(t *testing.T, j *json.JSON) {
 			{Name: "Alice", Age: 30},
 			{Name: "Bob", Age: 25},
 		}
-		result, err := j.Encode(input)
+		var result []byte
+		err := json.Encode(input, &result)
 		if err != nil {
 			t.Fatalf("Encode failed: %v", err)
 		}
@@ -76,11 +77,11 @@ func EncodeShared(t *testing.T, j *json.JSON) {
 	})
 }
 
-func DecodeShared(t *testing.T, j *json.JSON) {
+func DecodeShared(t *testing.T) {
 	t.Run("Decode String", func(t *testing.T) {
 		input := `"world"`
 		var result string
-		err := j.Decode([]byte(input), &result)
+		err := json.Decode([]byte(input), &result)
 		if err != nil {
 			t.Fatalf("Decode failed: %v", err)
 		}
@@ -92,7 +93,7 @@ func DecodeShared(t *testing.T, j *json.JSON) {
 	t.Run("Decode Int", func(t *testing.T) {
 		input := "456"
 		var result int
-		err := j.Decode([]byte(input), &result)
+		err := json.Decode([]byte(input), &result)
 		if err != nil {
 			t.Fatalf("Decode failed: %v", err)
 		}
@@ -104,7 +105,7 @@ func DecodeShared(t *testing.T, j *json.JSON) {
 	t.Run("Decode Struct", func(t *testing.T) {
 		input := `{"name":"Bob","age":25}`
 		var result TestStruct
-		err := j.Decode([]byte(input), &result)
+		err := json.Decode([]byte(input), &result)
 		if err != nil {
 			t.Fatalf("Decode failed: %v", err)
 		}
@@ -117,7 +118,7 @@ func DecodeShared(t *testing.T, j *json.JSON) {
 	t.Run("Decode Slice of Structs", func(t *testing.T) {
 		input := `[{"name":"Alice","age":30},{"name":"Bob","age":25}]`
 		var result []TestStruct
-		err := j.Decode([]byte(input), &result)
+		err := json.Decode([]byte(input), &result)
 		if err != nil {
 			t.Fatalf("Decode failed: %v", err)
 		}
@@ -154,7 +155,8 @@ func DecodeShared(t *testing.T, j *json.JSON) {
 			Data:      [][]byte{innerData},
 		}
 
-		encoded, err := j.Encode(packet)
+		var encoded []byte
+		err := json.Encode(packet, &encoded)
 		if err != nil {
 			t.Fatalf("Failed to encode packet: %v", err)
 		}
@@ -162,7 +164,7 @@ func DecodeShared(t *testing.T, j *json.JSON) {
 
 		// Now decode it back
 		var decoded Packet
-		err = j.Decode(encoded, &decoded)
+		err = json.Decode(encoded, &decoded)
 		if err != nil {
 			t.Fatalf("Failed to decode packet: %v", err)
 		}
@@ -208,14 +210,15 @@ func DecodeShared(t *testing.T, j *json.JSON) {
 			},
 		}
 
-		encoded, err := j.Encode(batch)
+		var encoded []byte
+		err := json.Encode(batch, &encoded)
 		if err != nil {
 			t.Fatalf("Failed to encode batch: %v", err)
 		}
 		t.Logf("Encoded batch: %s", string(encoded))
 
 		var decoded BatchRequest
-		err = j.Decode(encoded, &decoded)
+		err = json.Decode(encoded, &decoded)
 		if err != nil {
 			t.Fatalf("Failed to decode batch: %v", err)
 		}
@@ -265,14 +268,15 @@ func DecodeShared(t *testing.T, j *json.JSON) {
 			Message:     "OK",
 		}
 
-		encoded, err := j.Encode(result)
+		var encoded []byte
+		err := json.Encode(result, &encoded)
 		if err != nil {
 			t.Fatalf("Failed to encode PacketResult: %v", err)
 		}
 		t.Logf("Encoded PacketResult: %s", string(encoded))
 
 		var decoded PacketResult
-		err = j.Decode(encoded, &decoded)
+		err = json.Decode(encoded, &decoded)
 		if err != nil {
 			t.Fatalf("Failed to decode PacketResult: %v", err)
 		}
@@ -330,14 +334,15 @@ func DecodeShared(t *testing.T, j *json.JSON) {
 			},
 		}
 
-		encoded, err := j.Encode(batch)
+		var encoded []byte
+		err := json.Encode(batch, &encoded)
 		if err != nil {
 			t.Fatalf("Failed to encode BatchResponse: %v", err)
 		}
 		t.Logf("Encoded BatchResponse: %s", string(encoded))
 
 		var decoded BatchResponse
-		err = j.Decode(encoded, &decoded)
+		err = json.Decode(encoded, &decoded)
 		if err != nil {
 			t.Fatalf("Failed to decode BatchResponse: %v", err)
 		}
@@ -375,7 +380,7 @@ func DecodeShared(t *testing.T, j *json.JSON) {
 
 		userData := `{"id":123,"name":"John","email":"john@example.com"}`
 
-		err := j.Decode([]byte(userData), handler)
+		err := json.Decode([]byte(userData), handler)
 		if err != nil {
 			t.Fatalf("Failed to decode into handler: %v", err)
 		}
@@ -410,7 +415,8 @@ func DecodeShared(t *testing.T, j *json.JSON) {
 
 		// Step 1: Create user and encode
 		user := User{Name: "John", Email: "john@example.com"}
-		userData, err := j.Encode(&user)
+		var userData []byte
+		err := json.Encode(&user, &userData)
 		if err != nil {
 			t.Fatalf("Failed to encode user: %v", err)
 		}
@@ -426,7 +432,8 @@ func DecodeShared(t *testing.T, j *json.JSON) {
 
 		// Step 3: Create batch request
 		batch := BatchRequest{Packets: []Packet{packet}}
-		batchBytes, err := j.Encode(batch)
+		var batchBytes []byte
+		err = json.Encode(batch, &batchBytes)
 		if err != nil {
 			t.Fatalf("Failed to encode batch: %v", err)
 		}
@@ -434,7 +441,7 @@ func DecodeShared(t *testing.T, j *json.JSON) {
 
 		// Step 4: Decode batch request
 		var decodedBatch BatchRequest
-		err = j.Decode(batchBytes, &decodedBatch)
+		err = json.Decode(batchBytes, &decodedBatch)
 		if err != nil {
 			t.Fatalf("Failed to decode batch: %v", err)
 		}
@@ -454,7 +461,7 @@ func DecodeShared(t *testing.T, j *json.JSON) {
 
 		// Step 5: Decode user from packet data (like decodeWithKnownType does)
 		handler := &User{}
-		err = j.Decode(pkt.Data[0], handler)
+		err = json.Decode(pkt.Data[0], handler)
 		if err != nil {
 			t.Fatalf("Failed to decode user from packet data: %v", err)
 		}

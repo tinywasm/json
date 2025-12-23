@@ -1,9 +1,9 @@
 //go:build wasm
 
-package json
+package json_test
 
 import (
-	"encoding/json"
+	stlib "encoding/json"
 	"testing"
 
 	"github.com/tinywasm/json"
@@ -35,12 +35,12 @@ var benchData = BenchStruct{
 
 var benchJSON = []byte(`{"id":12345,"name":"John Doe","email":"john.doe@example.com","active":true,"score":98.5,"tags":["golang","wasm","json","benchmark"],"metadata":{"department":"engineering","level":"senior","location":"remote"}}`)
 
-// TinyJSON Benchmarks
+// JSON Benchmarks
 func BenchmarkTinyJSON_Encode(b *testing.B) {
-	tj := json.New()
 	b.ResetTimer()
+	var result []byte
 	for i := 0; i < b.N; i++ {
-		_, err := tj.Encode(benchData)
+		err := json.Encode(benchData, &result)
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -48,11 +48,10 @@ func BenchmarkTinyJSON_Encode(b *testing.B) {
 }
 
 func BenchmarkTinyJSON_Decode(b *testing.B) {
-	tj := json.New()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		var result BenchStruct
-		err := tj.Decode(benchJSON, &result)
+		err := json.Decode(benchJSON, &result)
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -60,15 +59,15 @@ func BenchmarkTinyJSON_Decode(b *testing.B) {
 }
 
 func BenchmarkTinyJSON_EncodeDecode(b *testing.B) {
-	tj := json.New()
 	b.ResetTimer()
+	var result []byte
 	for i := 0; i < b.N; i++ {
-		encoded, err := tj.Encode(benchData)
+		err := json.Encode(benchData, &result)
 		if err != nil {
 			b.Fatal(err)
 		}
-		var result BenchStruct
-		err = tj.Decode(encoded, &result)
+		var decoded BenchStruct
+		err = json.Decode(result, &decoded)
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -79,7 +78,7 @@ func BenchmarkTinyJSON_EncodeDecode(b *testing.B) {
 func BenchmarkStdlib_Encode(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, err := json.Marshal(benchData)
+		_, err := stlib.Marshal(benchData)
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -90,7 +89,7 @@ func BenchmarkStdlib_Decode(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		var result BenchStruct
-		err := json.Unmarshal(benchJSON, &result)
+		err := stlib.Unmarshal(benchJSON, &result)
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -100,12 +99,12 @@ func BenchmarkStdlib_Decode(b *testing.B) {
 func BenchmarkStdlib_EncodeDecode(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		encoded, err := json.Marshal(benchData)
+		encoded, err := stlib.Marshal(benchData)
 		if err != nil {
 			b.Fatal(err)
 		}
 		var result BenchStruct
-		err = json.Unmarshal(encoded, &result)
+		err = stlib.Unmarshal(encoded, &result)
 		if err != nil {
 			b.Fatal(err)
 		}

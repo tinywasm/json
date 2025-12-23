@@ -3,7 +3,7 @@
 README_FILE="benchmarks/README.md"
 
 echo "=========================================="
-echo "WASM Benchmark: TinyJSON vs Stdlib JSON"
+echo "WASM Benchmark: JSON vs Stdlib JSON"
 echo "=========================================="
 
 # Check if wasmbrowsertest is installed

@@ -1,27 +1,16 @@
 package json
 
 type codec interface {
-	Encode(data any) ([]byte, error)
-	Decode(data []byte, v any) error
+	Encode(input any, output any) error
+	Decode(input any, output any) error
 }
 
-type JSON struct {
-	codec codec
+var instance codec = getJSONCodec()
+
+func Encode(input any, output any) error {
+	return instance.Encode(input, output)
 }
 
-func New() *JSON {
-
-	t := &JSON{
-		codec: getJSONCodec(),
-	}
-
-	return t
-}
-
-func (t *JSON) Encode(data any) ([]byte, error) {
-	return t.codec.Encode(data)
-}
-
-func (t *JSON) Decode(data []byte, v any) error {
-	return t.codec.Decode(data, v)
+func Decode(input any, output any) error {
+	return instance.Decode(input, output)
 }

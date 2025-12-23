@@ -3,6 +3,7 @@
 package json
 
 import (
+	"io"
 	"reflect"
 	"syscall/js"
 
@@ -24,41 +25,71 @@ type wasmJSONCodec struct {
 	jsArray  js.Value
 }
 
-func (j *wasmJSONCodec) Encode(data any) ([]byte, error) {
+func (j *wasmJSONCodec) Encode(input any, output any) error {
 	// Convert Go value to JavaScript value
-	jsValue := ConvertGoToJS(data)
+	jsValue := j.convertGoToJS(input)
 
 	// Use browser's JSON.stringify
 	jsonString := j.jsJSON.Call("stringify", jsValue).String()
 
-	return []byte(jsonString), nil
+	switch out := output.(type) {
+	case *[]byte:
+		*out = []byte(jsonString)
+	case *string:
+		*out = jsonString
+	case io.Writer:
+		_, err := out.Write([]byte(jsonString))
+		return err
+	default:
+		return Err("json: unsupported output type")
+	}
+
+	return nil
 }
 
-func (j *wasmJSONCodec) Decode(data []byte, v any) error {
+func (j *wasmJSONCodec) Decode(input any, output any) error {
+	var jsonStr string
+
+	switch in := input.(type) {
+	case string:
+		jsonStr = in
+	case []byte:
+		jsonStr = string(in)
+	case io.Reader:
+		// WASM currently reads all into memory for JSON.parse
+		b, err := io.ReadAll(in)
+		if err != nil {
+			return err
+		}
+		jsonStr = string(b)
+	default:
+		return Err("json: unsupported input type")
+	}
+
 	// Use browser's JSON.parse
-	jsValue := j.jsJSON.Call("parse", string(data))
+	jsValue := j.jsJSON.Call("parse", jsonStr)
 
 	// Convert JavaScript value to Go value
-	return ConvertJSToGo(jsValue, v)
+	return j.convertJSToGo(jsValue, output)
 }
 
-// ConvertJSToGo converts JavaScript values to Go values
-func ConvertJSToGo(jsVal js.Value, v any) error {
+// convertJSToGo converts JavaScript values to Go values
+func (j *wasmJSONCodec) convertJSToGo(jsVal js.Value, v any) error {
 	// Basic implementation - extend as needed
 	switch ptr := v.(type) {
 	case *map[string]any:
 		*ptr = make(map[string]any)
-		keys := js.Global().Get("Object").Call("keys", jsVal)
+		keys := j.jsObject.Call("keys", jsVal)
 		length := keys.Length()
 		for i := 0; i < length; i++ {
 			key := keys.Index(i).String()
-			(*ptr)[key] = ConvertJSValueToGo(jsVal.Get(key))
+			(*ptr)[key] = j.convertJSValueToGo(jsVal.Get(key))
 		}
 	case *[]any:
 		length := jsVal.Length()
 		*ptr = make([]any, length)
 		for i := 0; i < length; i++ {
-			(*ptr)[i] = ConvertJSValueToGo(jsVal.Index(i))
+			(*ptr)[i] = j.convertJSValueToGo(jsVal.Index(i))
 		}
 	case *string:
 		*ptr = jsVal.String()
@@ -97,7 +128,7 @@ func ConvertJSToGo(jsVal js.Value, v any) error {
 				}
 			}
 
-			if !jsVal.InstanceOf(js.Global().Get("Array")) {
+			if !jsVal.InstanceOf(j.jsArray) {
 				return nil // Not an array
 			}
 
@@ -121,7 +152,7 @@ func ConvertJSToGo(jsVal js.Value, v any) error {
 				newElem := reflect.New(elemType)
 
 				// Recursively decode into the new element
-				if err := ConvertJSToGo(jsItem, newElem.Interface()); err != nil {
+				if err := j.convertJSToGo(jsItem, newElem.Interface()); err != nil {
 					return err
 				}
 
@@ -159,11 +190,11 @@ func ConvertJSToGo(jsVal js.Value, v any) error {
 				if !jsField.IsUndefined() && !jsField.IsNull() {
 					// Recursively decode
 					fieldVal := elem.Field(i)
-					// We need to pass a pointer to the field to ConvertJSToGo if possible,
+					// We need to pass a pointer to the field to convertJSToGo if possible,
 					// or handle setting the value directly.
-					// Since ConvertJSToGo takes 'any' (interface{}), we can pass a pointer to the field.
+					// Since convertJSToGo takes 'any' (interface{}), we can pass a pointer to the field.
 					if fieldVal.CanAddr() {
-						ConvertJSToGo(jsField, fieldVal.Addr().Interface())
+						j.convertJSToGo(jsField, fieldVal.Addr().Interface())
 					}
 				}
 			}
@@ -172,9 +203,9 @@ func ConvertJSToGo(jsVal js.Value, v any) error {
 	return nil
 }
 
-// ConvertJSValueToGo converts a js.Value to a Go value recursively
+// convertJSValueToGo converts a js.Value to a Go value recursively
 // eg: js.Value representing { "key": [1, 2, 3], "flag": true } becomes map[string]any{ "key": []any{1, 2, 3}, "flag": true }
-func ConvertJSValueToGo(jsVal js.Value) any {
+func (j *wasmJSONCodec) convertJSValueToGo(jsVal js.Value) any {
 	switch jsVal.Type() {
 	case js.TypeNull, js.TypeUndefined:
 		return nil
@@ -185,20 +216,20 @@ func ConvertJSValueToGo(jsVal js.Value) any {
 	case js.TypeString:
 		return jsVal.String()
 	case js.TypeObject:
-		if jsVal.InstanceOf(js.Global().Get("Array")) {
+		if jsVal.InstanceOf(j.jsArray) {
 			length := jsVal.Length()
 			arr := make([]any, length)
 			for i := 0; i < length; i++ {
-				arr[i] = ConvertJSValueToGo(jsVal.Index(i))
+				arr[i] = j.convertJSValueToGo(jsVal.Index(i))
 			}
 			return arr
 		}
 		obj := make(map[string]any)
-		keys := js.Global().Get("Object").Call("keys", jsVal)
+		keys := j.jsObject.Call("keys", jsVal)
 		length := keys.Length()
 		for i := 0; i < length; i++ {
 			key := keys.Index(i).String()
-			obj[key] = ConvertJSValueToGo(jsVal.Get(key))
+			obj[key] = j.convertJSValueToGo(jsVal.Get(key))
 		}
 		return obj
 	default:
@@ -206,8 +237,8 @@ func ConvertJSValueToGo(jsVal js.Value) any {
 	}
 }
 
-// ConvertGoToJS converts Go values to JavaScript values recursively
-func ConvertGoToJS(data any) js.Value {
+// convertGoToJS converts Go values to JavaScript values recursively
+func (j *wasmJSONCodec) convertGoToJS(data any) js.Value {
 	if data == nil {
 		return js.Null()
 	}
@@ -244,37 +275,37 @@ func ConvertGoToJS(data any) js.Value {
 	case []byte:
 		return js.ValueOf(string(v))
 	case []any:
-		arr := js.Global().Get("Array").New(len(v))
+		arr := j.jsArray.New(len(v))
 		for i, item := range v {
-			arr.SetIndex(i, ConvertGoToJS(item))
+			arr.SetIndex(i, j.convertGoToJS(item))
 		}
 		return arr
 	case map[string]any:
-		obj := js.Global().Get("Object").New()
+		obj := j.jsObject.New()
 		for key, val := range v {
-			obj.Set(key, ConvertGoToJS(val))
+			obj.Set(key, j.convertGoToJS(val))
 		}
 		return obj
 	case map[string]string:
-		obj := js.Global().Get("Object").New()
+		obj := j.jsObject.New()
 		for key, val := range v {
 			obj.Set(key, js.ValueOf(val))
 		}
 		return obj
 	case map[string]int:
-		obj := js.Global().Get("Object").New()
+		obj := j.jsObject.New()
 		for key, val := range v {
 			obj.Set(key, js.ValueOf(val))
 		}
 		return obj
 	case []string:
-		arr := js.Global().Get("Array").New(len(v))
+		arr := j.jsArray.New(len(v))
 		for i, item := range v {
 			arr.SetIndex(i, js.ValueOf(item))
 		}
 		return arr
 	case []int:
-		arr := js.Global().Get("Array").New(len(v))
+		arr := j.jsArray.New(len(v))
 		for i, item := range v {
 			arr.SetIndex(i, js.ValueOf(item))
 		}
@@ -288,21 +319,21 @@ func ConvertGoToJS(data any) js.Value {
 			if val.IsNil() {
 				return js.Null()
 			}
-			return ConvertGoToJS(val.Elem().Interface())
+			return j.convertGoToJS(val.Elem().Interface())
 		}
 
 		// Handle slices of any type using reflection
 		if val.Kind() == reflect.Slice {
-			arr := js.Global().Get("Array").New(val.Len())
+			arr := j.jsArray.New(val.Len())
 			for i := 0; i < val.Len(); i++ {
-				arr.SetIndex(i, ConvertGoToJS(val.Index(i).Interface()))
+				arr.SetIndex(i, j.convertGoToJS(val.Index(i).Interface()))
 			}
 			return arr
 		}
 
 		// Handle structs
 		if val.Kind() == reflect.Struct {
-			obj := js.Global().Get("Object").New()
+			obj := j.jsObject.New()
 			typ := val.Type()
 			for i := 0; i < val.NumField(); i++ {
 				field := typ.Field(i)
@@ -320,7 +351,7 @@ func ConvertGoToJS(data any) js.Value {
 					jsonTag = jsonTag[:idx]
 				}
 
-				obj.Set(jsonTag, ConvertGoToJS(val.Field(i).Interface()))
+				obj.Set(jsonTag, j.convertGoToJS(val.Field(i).Interface()))
 			}
 			return obj
 		}

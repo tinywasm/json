@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# TinyJSON WASM Build Script
-# Compiles WASM binaries using either TinyJSON or stdlib encoding/json
+# JSON WASM Build Script
+# Compiles WASM binaries using either JSON or stdlib encoding/json
 
 set -e
 
@@ -23,8 +23,8 @@ if [ "$USE_STDLIB" = true ]; then
     echo "Building with encoding/json (stdlib)..."
     SOURCE_DIR="clients/stdlib"
 else
-    echo "Building with TinyJSON..."
-    SOURCE_DIR="clients/tinyjson"
+    echo "Building with JSON..."
+    SOURCE_DIR="clients/json"
 fi
 
 # Build the WASM binary
