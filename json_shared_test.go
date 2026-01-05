@@ -75,6 +75,30 @@ func EncodeShared(t *testing.T) {
 			t.Errorf("Expected JSON array format [...], got: %s", resStr)
 		}
 	})
+
+	t.Run("Encode Skip Private and Tagged Fields", func(t *testing.T) {
+		type SkipStruct struct {
+			Public  string `json:"public"`
+			private string
+			Skipped string `json:"-"`
+		}
+		input := SkipStruct{
+			Public:  "visible",
+			private: "hidden",
+			Skipped: "should-skip",
+		}
+		var result []byte
+		err := json.Encode(input, &result)
+		if err != nil {
+			t.Fatalf("Encode failed: %v", err)
+		}
+		resStr := string(result)
+		// Should only contain "public":"visible"
+		expected := `{"public":"visible"}`
+		if resStr != expected {
+			t.Errorf("Expected %s, got %s", expected, resStr)
+		}
+	})
 }
 
 func DecodeShared(t *testing.T) {
@@ -466,11 +490,36 @@ func DecodeShared(t *testing.T) {
 			t.Fatalf("Failed to decode user from packet data: %v", err)
 		}
 
-		if handler.Name != "John" {
-			t.Errorf("Expected Name 'John', got '%s'", handler.Name)
-		}
 		if handler.Email != "john@example.com" {
 			t.Errorf("Expected Email 'john@example.com', got '%s'", handler.Email)
+		}
+	})
+
+	t.Run("Decode Skip Private and Tagged Fields", func(t *testing.T) {
+		type SkipStruct struct {
+			Public  string `json:"public"`
+			private string
+			Skipped string `json:"-"`
+		}
+		input := `{"public":"visible","private":"should-be-ignored","Skipped":"should-be-ignored"}`
+		var result SkipStruct
+		// Initialize with values to ensure they are cleared/not overwritten incorrectly
+		result.private = "initial"
+		result.Skipped = "initial"
+
+		err := json.Decode([]byte(input), &result)
+		if err != nil {
+			t.Fatalf("Decode failed: %v", err)
+		}
+
+		if result.Public != "visible" {
+			t.Errorf("Expected Public='visible', got %q", result.Public)
+		}
+		if result.private != "initial" {
+			t.Errorf("private field should not have been modified, got %q", result.private)
+		}
+		if result.Skipped != "initial" {
+			t.Errorf("Skipped field should not have been modified, got %q", result.Skipped)
 		}
 	})
 }

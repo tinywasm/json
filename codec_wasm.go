@@ -175,15 +175,18 @@ func (j *wasmJSONCodec) convertJSToGo(jsVal js.Value, v any) error {
 			typ := elem.Type()
 			for i := 0; i < elem.NumField(); i++ {
 				field := typ.Field(i)
-				jsonTag := field.Tag.Get("json")
-				if jsonTag == "" {
-					jsonTag = field.Name
-				}
-				if jsonTag == "-" {
+				if !HasUpperPrefix(field.Name) {
 					continue
 				}
-				if idx := Index(jsonTag, ","); idx != -1 {
-					jsonTag = jsonTag[:idx]
+
+				tag := Convert(string(field.Tag))
+				jsonTag, found := tag.TagValue("json")
+				if found && jsonTag == "-" {
+					continue
+				}
+
+				if jsonTag == "" {
+					jsonTag = field.Name
 				}
 
 				jsField := jsVal.Get(jsonTag)
@@ -337,18 +340,18 @@ func (j *wasmJSONCodec) convertGoToJS(data any) js.Value {
 			typ := val.Type()
 			for i := 0; i < val.NumField(); i++ {
 				field := typ.Field(i)
-				jsonTag := field.Tag.Get("json")
-				if jsonTag == "" {
-					jsonTag = field.Name
-				}
-				// Handle "omitempty" and other tag options if needed, but for now basic name support
-				if jsonTag == "-" {
+				if !HasUpperPrefix(field.Name) {
 					continue
 				}
 
-				// Simple tag parsing to get the name
-				if idx := Index(jsonTag, ","); idx != -1 {
-					jsonTag = jsonTag[:idx]
+				tag := Convert(string(field.Tag))
+				jsonTag, found := tag.TagValue("json")
+				if found && jsonTag == "-" {
+					continue
+				}
+
+				if jsonTag == "" {
+					jsonTag = field.Name
 				}
 
 				obj.Set(jsonTag, j.convertGoToJS(val.Field(i).Interface()))
