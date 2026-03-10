@@ -1,8 +1,8 @@
-# PLAN: Rewrite JSON Codec — Platform-Agnostic, Zero Reflect
+# PLAN: Rewrite JSON Codec — Fielder-Only, Zero Reflect
 
 ## Development Rules
 
-- **Standard Library Only:** No external assertion libraries. Use `testing` and `reflect` for test helpers only.
+- **Standard Library Only:** No external assertion libraries. Use `testing` for tests.
 - **Testing Runner:** Install and use `gotest`:
   ```bash
   go install github.com/tinywasm/devflow/cmd/gotest@latest
@@ -20,102 +20,54 @@
   - `Field.JSON string` for JSON key + modifiers.
   - `FieldStruct` constant for nested struct detection.
   - `Fielder` interface (`Schema()`, `Values()`, `Pointers()`).
-- **`tinywasm/orm`** must be published with `ormc` generating `Field.JSON` from `json:` tags.
+  - `JSONEscape(s string, b *Builder)` for string escaping.
+  - `IsZero(v any) bool` for omitempty support.
 - Update `go.mod` to require the new `fmt` version before starting.
 
 ## Context
 
 The `tinywasm/json` package currently has two codec implementations:
-- **`codec_wasm.go`** (`//go:build wasm`): Uses browser's `JSON.parse`/`JSON.stringify` + ~30 reflect operations to bridge Go ↔ JS values.
-- **`codec_stdlib.go`** (`//go:build !wasm`): Delegates to `encoding/json` (which uses reflect internally).
+- **`codec_wasm.go`** (`//go:build wasm`): Browser JSON API + ~30 reflect operations.
+- **`codec_stdlib.go`** (`//go:build !wasm`): Delegates to `encoding/json` (reflect internally).
 
-This creates two problems:
-1. **WASM binary bloat** — reflect is expensive in TinyGo builds.
-2. **Potential inconsistency** — two different codecs could produce different JSON for edge cases.
+### Problems
+1. **Two codecs** → potential inconsistency, double maintenance.
+2. **reflect** → WASM binary bloat.
+3. **Redundant code** → logic that already exists in `tinywasm/fmt` is duplicated.
 
 ### New Architecture
 
-A **single, platform-agnostic codec** with zero reflect:
-- **Structs** that implement `fmt.Fielder` → manual JSON encoding/decoding using `Schema()`, `Values()`, `Pointers()`.
-- **Primitives** (`string`, `int`, `float64`, `bool`, `[]byte`) → type switches (no reflect needed).
-- **Known collections** (`[]string`, `[]int`, `map[string]any`, etc.) → type switches.
-- **Unknown types** (struct without `Fielder`, unknown slices) → **error**. All structs in the tinywasm ecosystem must go through `ormc`.
+**Single codec, no build tags, no reflect, no `encoding/json`, no `syscall/js`.**
+
+- **Public API accepts only `fmt.Fielder`** — no primitives, no maps, no slices in the signature.
+- **Encoding:** Iterates `Schema()` + `Values()` → builds JSON string via `fmt.Builder` + `fmt.JSONEscape`.
+- **Decoding:** Minimal JSON parser → populates struct via `Pointers()`.
+- **All number/bool formatting and parsing** reuses `fmt.Convert()` — zero duplication.
+- **Unknown types → error.** All structs must implement `Fielder` via `ormc`.
 
 ### What This Plan Does NOT Cover
 
 - Changes to `tinywasm/fmt` or `tinywasm/orm` — those have their own independent plans.
-- Support for arbitrary `any` types without `Fielder` — explicitly out of scope.
 
 ---
 
-## Stage 1: Create Unified Encoder
+## Stage 1: Create Encoder
 
-← None | Next → [Stage 2](#stage-2-create-unified-decoder)
+← None | Next → [Stage 2](#stage-2-create-decoder)
 
 ### 1.1 Create `encode.go`
 
-New file replacing both `convertGoToJS` (wasm) and `json.Marshal` (stdlib). Single implementation, no build tags.
+Single file, no build tags. The only public entry point for encoding.
 
-**Public API (unchanged):**
-```go
-func Encode(input any, output any) error
-```
-
-**Internal encoding strategy:**
+**Public API (breaking change):**
 
 ```go
-func encode(b *fmt.Builder, data any) error {
-    switch v := data.(type) {
-    // 1. Fielder — zero reflect, uses Schema + Values
-    case fmt.Fielder:
-        return encodeFielder(b, v)
-
-    // 2. Primitives
-    case string:
-        encodeString(b, v)
-    case bool:
-        encodeBool(b, v)
-    case int:
-        b.WriteString(fmt.Convert(v).String())
-    case int64:
-        b.WriteString(fmt.Convert(v).String())
-    case float64:
-        b.WriteString(fmt.Convert(v).String())
-    // ... int8, int16, int32, uint, uint8, uint16, uint32, uint64, float32
-
-    // 3. []byte → JSON string (base64 or raw, matching current behavior)
-    case []byte:
-        encodeString(b, string(v))
-
-    // 4. Known slice types
-    case []string:
-        encodeSlice(b, v, func(b *fmt.Builder, s string) { encodeString(b, s) })
-    case []int:
-        encodeSlice(b, v, func(b *fmt.Builder, n int) { b.WriteString(fmt.Convert(n).String()) })
-    case []any:
-        return encodeAnySlice(b, v)
-
-    // 5. Known map types
-    case map[string]any:
-        return encodeMap(b, v)
-    case map[string]string:
-        return encodeStringMap(b, v)
-
-    // 6. nil
-    case nil:
-        b.WriteString("null")
-
-    // 7. Unknown → error
-    default:
-        return fmt.Err("json", "encode", "unsupported type, implement fmt.Fielder via ormc")
-    }
-    return nil
-}
+// Encode serializes a Fielder to JSON.
+// output: *[]byte | *string | io.Writer.
+func Encode(data fmt.Fielder, output any) error
 ```
 
-### 1.2 Implement `encodeFielder()`
-
-The core function that replaces all struct reflection:
+### 1.2 Internal implementation
 
 ```go
 func encodeFielder(b *fmt.Builder, f fmt.Fielder) error {
@@ -125,7 +77,6 @@ func encodeFielder(b *fmt.Builder, f fmt.Fielder) error {
 
     first := true
     for i, field := range schema {
-        // Parse JSON key from Field.JSON (or fall back to Field.Name)
         key, omitempty := parseJSONTag(field)
         if key == "-" {
             continue
@@ -133,8 +84,7 @@ func encodeFielder(b *fmt.Builder, f fmt.Fielder) error {
 
         val := values[i]
 
-        // Handle omitempty: skip zero values
-        if omitempty && isZero(val) {
+        if omitempty && fmt.IsZero(val) {
             continue
         }
 
@@ -144,10 +94,12 @@ func encodeFielder(b *fmt.Builder, f fmt.Fielder) error {
         first = false
 
         // Write key
-        encodeString(b, key)
+        b.WriteByte('"')
+        fmt.JSONEscape(key, b)
+        b.WriteByte('"')
         b.WriteByte(':')
 
-        // Write value — recurse if nested Fielder
+        // Write value
         if field.Type == fmt.FieldStruct {
             if nested, ok := val.(fmt.Fielder); ok {
                 if err := encodeFielder(b, nested); err != nil {
@@ -157,21 +109,52 @@ func encodeFielder(b *fmt.Builder, f fmt.Fielder) error {
             }
         }
 
-        if err := encode(b, val); err != nil {
-            return err
-        }
+        encodeValue(b, val)
     }
 
     b.WriteByte('}')
     return nil
 }
+
+// encodeValue writes a single Go value as JSON.
+// Only handles types that appear in Fielder.Values(): string, int variants,
+// float variants, bool, []byte, nil.
+func encodeValue(b *fmt.Builder, v any) {
+    switch val := v.(type) {
+    case nil:
+        b.WriteString("null")
+    case string:
+        b.WriteByte('"')
+        fmt.JSONEscape(val, b)
+        b.WriteByte('"')
+    case bool:
+        if val {
+            b.WriteString("true")
+        } else {
+            b.WriteString("false")
+        }
+    case []byte:
+        b.WriteByte('"')
+        fmt.JSONEscape(string(val), b)
+        b.WriteByte('"')
+    default:
+        // int, int8..int64, uint..uint64, float32, float64
+        // All handled by fmt.Convert which already supports every numeric type.
+        b.WriteString(fmt.Convert(val).String())
+    }
+}
 ```
 
-### 1.3 Implement helper functions
+**Key design decisions:**
+- `encodeValue` only handles types that `Values()` can return. No maps, no slices, no generic `any` — those don't exist inside a Fielder.
+- `fmt.JSONEscape` handles all string escaping — no duplication.
+- `fmt.Convert(val).String()` handles all numeric formatting — no duplication.
+- `fmt.IsZero(val)` handles omitempty — no duplication.
+
+### 1.3 Helper: `parseJSONTag`
 
 ```go
 // parseJSONTag extracts key and omitempty from Field.JSON.
-// If Field.JSON is empty, returns Field.Name as key.
 func parseJSONTag(f fmt.Field) (key string, omitempty bool) {
     tag := f.JSON
     if tag == "" {
@@ -180,80 +163,32 @@ func parseJSONTag(f fmt.Field) (key string, omitempty bool) {
     if tag == "-" {
         return "-", false
     }
-    // Split on comma: "email,omitempty" → key="email", omitempty=true
-    parts := fmt.Convert(tag).Split(",")
-    key = parts[0]
+    comma := -1
+    for i := 0; i < len(tag); i++ {
+        if tag[i] == ',' {
+            comma = i
+            break
+        }
+    }
+    if comma < 0 {
+        return tag, false
+    }
+    key = tag[:comma]
     if key == "" {
         key = f.Name
     }
-    for i := 1; i < len(parts); i++ {
-        if parts[i] == "omitempty" {
-            omitempty = true
-        }
-    }
-    return key, omitempty
-}
-
-// encodeString writes a JSON-escaped string with quotes.
-func encodeString(b *fmt.Builder, s string) {
-    b.WriteByte('"')
-    // Escape: \", \\, \n, \r, \t, control chars
-    for i := 0; i < len(s); i++ {
-        c := s[i]
-        switch c {
-        case '"':
-            b.WriteString(`\"`)
-        case '\\':
-            b.WriteString(`\\`)
-        case '\n':
-            b.WriteString(`\n`)
-        case '\r':
-            b.WriteString(`\r`)
-        case '\t':
-            b.WriteString(`\t`)
-        default:
-            if c < 0x20 {
-                b.WriteString(`\u00`)
-                b.WriteByte("0123456789abcdef"[c>>4])
-                b.WriteByte("0123456789abcdef"[c&0xf])
-            } else {
-                b.WriteByte(c)
-            }
-        }
-    }
-    b.WriteByte('"')
-}
-
-// isZero returns true if a value is its zero value (for omitempty).
-func isZero(v any) bool {
-    switch val := v.(type) {
-    case string:
-        return val == ""
-    case bool:
-        return !val
-    case int:
-        return val == 0
-    case int64:
-        return val == 0
-    case float64:
-        return val == 0
-    case []byte:
-        return len(val) == 0
-    case nil:
-        return true
-    }
-    return false
+    return key, tag[comma+1:] == "omitempty"
 }
 ```
 
+**Note:** No `fmt.Convert().Split()` needed — a simple byte scan for one comma is faster and avoids allocation.
+
 ### 1.4 Output handling
 
-The `Encode` function writes to the requested output type:
-
 ```go
-func Encode(input any, output any) error {
+func Encode(data fmt.Fielder, output any) error {
     var b fmt.Builder
-    if err := encode(&b, input); err != nil {
+    if err := encodeFielder(&b, data); err != nil {
         return err
     }
     result := b.String()
@@ -275,20 +210,18 @@ func Encode(input any, output any) error {
 
 ### 1.5 Tests
 
-- `TestEncodeFielderSimple`: Encode a mock `Fielder` with string/int/bool fields.
-- `TestEncodeFielderNested`: Encode a `Fielder` with `FieldStruct` field containing nested `Fielder`.
-- `TestEncodeFielderOmitEmpty`: Verify zero-value fields skipped when `JSON: "name,omitempty"`.
-- `TestEncodeFielderJSONExclude`: Field with `JSON: "-"` is not in output.
-- `TestEncodeFielderJSONKey`: Field with `JSON: "custom_key"` uses that key.
-- `TestEncodePrimitives`: All primitive types produce correct JSON.
-- `TestEncodeSlices`: `[]string`, `[]int`, `[]any` produce correct JSON arrays.
-- `TestEncodeMaps`: `map[string]any` produces correct JSON object.
-- `TestEncodeNil`: `nil` produces `"null"`.
-- `TestEncodeUnsupportedType`: Struct without `Fielder` returns error.
-- `TestEncodeStringEscaping`: Special chars (`"`, `\`, `\n`, control chars) correctly escaped.
-- `TestEncodeToBytes`: Output to `*[]byte`.
-- `TestEncodeToString`: Output to `*string`.
-- `TestEncodeToWriter`: Output to `io.Writer`.
+- `TestEncodeSimple`: Fielder with string/int/bool fields → correct JSON.
+- `TestEncodeNested`: Fielder with `FieldStruct` → recursive JSON object.
+- `TestEncodeOmitEmpty`: Zero-value fields with `omitempty` → skipped.
+- `TestEncodeJSONExclude`: `JSON: "-"` → field absent.
+- `TestEncodeJSONKey`: `JSON: "custom"` → uses custom key.
+- `TestEncodeJSONKeyFallback`: `JSON: ""` → uses `Field.Name`.
+- `TestEncodeStringEscaping`: Special chars correctly escaped.
+- `TestEncodeNilField`: `nil` value → `"null"`.
+- `TestEncodeBytes`: `[]byte` → JSON string.
+- `TestEncodeToBytes`: Output `*[]byte`.
+- `TestEncodeToString`: Output `*string`.
+- `TestEncodeToWriter`: Output `io.Writer`.
 
 ```bash
 gotest
@@ -296,21 +229,23 @@ gotest
 
 ---
 
-## Stage 2: Create Unified Decoder
+## Stage 2: Create Decoder
 
-← [Stage 1](#stage-1-create-unified-encoder) | Next → [Stage 3](#stage-3-remove-old-codecs)
+← [Stage 1](#stage-1-create-encoder) | Next → [Stage 3](#stage-3-remove-old-codecs)
 
 ### 2.1 Create `decode.go`
 
-New file replacing both `convertJSToGo` (wasm) and `json.Unmarshal` (stdlib).
+**Public API (breaking change):**
 
-**Decoding strategy — two-phase:**
-1. **Parse** JSON into a generic token stream or intermediate representation.
-2. **Populate** target using `Pointers()` from `Fielder`, or direct assignment for primitives.
+```go
+// Decode parses JSON into a Fielder.
+// input: []byte | string | io.Reader.
+func Decode(input any, data fmt.Fielder) error
+```
 
-### 2.2 Implement JSON parser
+### 2.2 Create `parser.go`
 
-A minimal, zero-allocation JSON tokenizer that works character-by-character:
+Minimal JSON parser (~200 lines). Parses JSON into Go primitives:
 
 ```go
 type parser struct {
@@ -321,24 +256,23 @@ type parser struct {
 func (p *parser) skipWhitespace()
 func (p *parser) peek() byte
 func (p *parser) next() byte
-func (p *parser) parseValue() (any, error)        // Dispatches by first char
-func (p *parser) parseString() (string, error)     // "..." with escape handling
-func (p *parser) parseNumber() (any, error)        // int64 or float64
-func (p *parser) parseBool() (bool, error)         // true/false
-func (p *parser) parseNull() error                 // null
-func (p *parser) parseArray() ([]any, error)       // [...]
-func (p *parser) parseObject() (map[string]any, error) // {...}
+func (p *parser) parseValue() (any, error)
+func (p *parser) parseString() (string, error)
+func (p *parser) parseNumber() (any, error)         // int64 if no decimal, float64 otherwise
+func (p *parser) parseBool() (bool, error)
+func (p *parser) parseNull() error
+func (p *parser) parseArray() ([]any, error)
+func (p *parser) parseObject() (map[string]any, error)
 ```
 
-**Design notes:**
-- Numbers are parsed as `int64` if no decimal point, `float64` otherwise (matching current behavior).
-- Strings handle all JSON escape sequences (`\"`, `\\`, `\/`, `\b`, `\f`, `\n`, `\r`, `\t`, `\uXXXX`).
-- The parser is ~200 lines — well within the 500-line limit for a single file.
+**Number parsing:** Uses `fmt.Convert(numberString).Int64()` / `.Float64()` instead of reimplementing number parsing. The parser extracts the raw number string, `fmt` does the conversion.
 
-### 2.3 Implement `decodeFielder()`
+**String unescaping:** Handles JSON escape sequences (`\"`, `\\`, `\/`, `\b`, `\f`, `\n`, `\r`, `\t`, `\uXXXX`). This is the inverse of `fmt.JSONEscape` and is specific to the JSON parser — it stays in `json`, not `fmt`.
+
+### 2.3 Implement `decodeFielder`
 
 ```go
-func decodeFielder(parsed map[string]any, f fmt.Fielder) error {
+func decodeFielder(obj map[string]any, f fmt.Fielder) error {
     schema := f.Schema()
     pointers := f.Pointers()
 
@@ -348,7 +282,7 @@ func decodeFielder(parsed map[string]any, f fmt.Fielder) error {
             continue
         }
 
-        val, exists := parsed[key]
+        val, exists := obj[key]
         if !exists {
             continue
         }
@@ -358,8 +292,8 @@ func decodeFielder(parsed map[string]any, f fmt.Fielder) error {
         // Nested struct: recurse
         if field.Type == fmt.FieldStruct {
             if nested, ok := ptr.(fmt.Fielder); ok {
-                if obj, ok := val.(map[string]any); ok {
-                    if err := decodeFielder(obj, nested); err != nil {
+                if innerObj, ok := val.(map[string]any); ok {
+                    if err := decodeFielder(innerObj, nested); err != nil {
                         return err
                     }
                     continue
@@ -367,14 +301,14 @@ func decodeFielder(parsed map[string]any, f fmt.Fielder) error {
             }
         }
 
-        // Write value to pointer based on FieldType
-        writeJSONValue(ptr, field.Type, val)
+        writeValue(ptr, field.Type, val)
     }
     return nil
 }
 
-// writeJSONValue writes a parsed JSON value into a Go pointer.
-func writeJSONValue(ptr any, ft fmt.FieldType, val any) {
+// writeValue writes a parsed JSON value into a Go pointer.
+// Uses fmt.Convert for type coercion where needed.
+func writeValue(ptr any, ft fmt.FieldType, val any) {
     switch ft {
     case fmt.FieldText:
         if p, ok := ptr.(*string); ok {
@@ -383,22 +317,46 @@ func writeJSONValue(ptr any, ft fmt.FieldType, val any) {
             }
         }
     case fmt.FieldInt:
-        if p, ok := ptr.(*int64); ok {
+        // Parser returns int64 for integers, float64 for decimals.
+        // Support *int, *int32, *int64 via type switches on ptr.
+        switch p := ptr.(type) {
+        case *int64:
             switch v := val.(type) {
             case int64:
                 *p = v
             case float64:
                 *p = int64(v)
             }
+        case *int:
+            switch v := val.(type) {
+            case int64:
+                *p = int(v)
+            case float64:
+                *p = int(v)
+            }
+        case *int32:
+            switch v := val.(type) {
+            case int64:
+                *p = int32(v)
+            case float64:
+                *p = int32(v)
+            }
         }
-        // Also handle *int, *int32, etc. via type switches
     case fmt.FieldFloat:
-        if p, ok := ptr.(*float64); ok {
+        switch p := ptr.(type) {
+        case *float64:
             switch v := val.(type) {
             case float64:
                 *p = v
             case int64:
                 *p = float64(v)
+            }
+        case *float32:
+            switch v := val.(type) {
+            case float64:
+                *p = float32(v)
+            case int64:
+                *p = float32(v)
             }
         }
     case fmt.FieldBool:
@@ -420,16 +378,14 @@ func writeJSONValue(ptr any, ft fmt.FieldType, val any) {
 ### 2.4 Decode entry point
 
 ```go
-func Decode(input any, output any) error {
-    // 1. Get JSON bytes from input
-    var data []byte
+func Decode(input any, data fmt.Fielder) error {
+    var raw []byte
     switch in := input.(type) {
     case []byte:
-        data = in
+        raw = in
     case string:
-        data = []byte(in)
+        raw = []byte(in)
     case io.Reader:
-        // Read all bytes
         var buf fmt.Builder
         tmp := make([]byte, 4096)
         for {
@@ -441,76 +397,43 @@ func Decode(input any, output any) error {
                 break
             }
         }
-        data = []byte(buf.String())
+        raw = []byte(buf.String())
     default:
         return fmt.Err("json", "decode", "input must be []byte, string, or io.Reader")
     }
 
-    // 2. Parse JSON
-    p := &parser{data: data}
+    p := &parser{data: raw}
     parsed, err := p.parseValue()
     if err != nil {
         return err
     }
 
-    // 3. Populate output
-    switch out := output.(type) {
-    case fmt.Fielder:
-        obj, ok := parsed.(map[string]any)
-        if !ok {
-            return fmt.Err("json", "decode", "expected JSON object for Fielder")
-        }
-        return decodeFielder(obj, out)
-
-    case *string:
-        if s, ok := parsed.(string); ok {
-            *out = s
-        }
-    case *int64:
-        if n, ok := parsed.(int64); ok {
-            *out = n
-        }
-    case *float64:
-        if n, ok := parsed.(float64); ok {
-            *out = n
-        }
-    case *bool:
-        if b, ok := parsed.(bool); ok {
-            *out = b
-        }
-    case *map[string]any:
-        if obj, ok := parsed.(map[string]any); ok {
-            *out = obj
-        }
-    case *[]any:
-        if arr, ok := parsed.([]any); ok {
-            *out = arr
-        }
-
-    default:
-        return fmt.Err("json", "decode", "unsupported output type, implement fmt.Fielder via ormc")
+    obj, ok := parsed.(map[string]any)
+    if !ok {
+        return fmt.Err("json", "decode", "expected JSON object for Fielder")
     }
-    return nil
+    return decodeFielder(obj, data)
 }
 ```
 
 ### 2.5 Tests
 
-- `TestDecodeFielderSimple`: Decode JSON object into mock `Fielder`.
-- `TestDecodeFielderNested`: Decode JSON with nested object into nested `Fielder`.
-- `TestDecodeFielderJSONKey`: Field with `JSON: "custom"` reads from `"custom"` key.
-- `TestDecodeFielderJSONExclude`: Field with `JSON: "-"` is skipped.
-- `TestDecodeFielderMissingField`: JSON missing a field → field unchanged.
-- `TestDecodeFielderExtraField`: JSON has extra field → silently ignored.
-- `TestDecodePrimitives`: Decode string, int, float, bool, null.
-- `TestDecodeArrays`: Decode JSON arrays into `*[]any`.
-- `TestDecodeObjects`: Decode JSON objects into `*map[string]any`.
-- `TestDecodeFromBytes`: Input as `[]byte`.
-- `TestDecodeFromString`: Input as `string`.
-- `TestDecodeFromReader`: Input as `io.Reader`.
-- `TestDecodeUnsupportedOutput`: Struct without `Fielder` returns error.
-- `TestDecodeStringEscapes`: JSON escape sequences (`\"`, `\\`, `\n`, `\uXXXX`) correctly parsed.
-- `TestDecodeNumbers`: Integer vs float detection (no decimal → int64, with decimal → float64).
+- `TestDecodeSimple`: JSON object → Fielder fields populated.
+- `TestDecodeNested`: Nested JSON object → nested Fielder.
+- `TestDecodeJSONKey`: `JSON: "custom"` → reads from `"custom"` key.
+- `TestDecodeJSONExclude`: `JSON: "-"` → field skipped.
+- `TestDecodeMissingField`: JSON missing a key → field unchanged.
+- `TestDecodeExtraField`: JSON has extra key → silently ignored.
+- `TestDecodeIntFromFloat`: JSON `1.0` → `int64(1)` when `FieldInt`.
+- `TestDecodeFloatFromInt`: JSON `1` → `float64(1.0)` when `FieldFloat`.
+- `TestDecodeBytes`: JSON string → `[]byte`.
+- `TestDecodeFromBytes`: Input `[]byte`.
+- `TestDecodeFromString`: Input `string`.
+- `TestDecodeFromReader`: Input `io.Reader`.
+- `TestDecodeStringEscapes`: `\"`, `\\`, `\n`, `\uXXXX` correctly unescaped.
+- `TestDecodeNumbers`: No decimal → `int64`, with decimal → `float64`.
+- `TestDecodeNull`: `null` value → field unchanged.
+- `TestDecodeInvalidJSON`: Malformed JSON → error.
 
 ```bash
 gotest
@@ -520,53 +443,33 @@ gotest
 
 ## Stage 3: Remove Old Codecs
 
-← [Stage 2](#stage-2-create-unified-decoder) | Next → [Stage 4](#stage-4-documentation-and-publish)
+← [Stage 2](#stage-2-create-decoder) | Next → [Stage 4](#stage-4-documentation-and-publish)
 
 ### 3.1 Delete platform-specific files
 
-- **Delete** `codec_wasm.go` (all reflect + js.Value logic).
-- **Delete** `codec_stdlib.go` (encoding/json delegation).
+- **Delete** `codec_wasm.go`
+- **Delete** `codec_stdlib.go`
 
 ### 3.2 Simplify `json.go`
 
-The codec interface pattern is no longer needed. `json.go` becomes:
+Remove `codec` interface, `getJSONCodec()`, `instance` var, build tags. The file becomes minimal — just package declaration and imports shared between `encode.go` and `decode.go`. Or remove it entirely if `encode.go` and `decode.go` are self-contained.
 
-```go
-package json
+### 3.3 Reorganize tests
 
-import "io"
+- **Delete** `json_stlib_test.go` and `json_wasm_test.go`.
+- **Update** `json_shared_test.go`: remove platform runner pattern, test `Encode`/`Decode` directly with mock `Fielder` types.
+- If >5 test files, move all to `tests/` directory.
 
-// Encode converts a Go value to JSON.
-// input: any supported type (fmt.Fielder, primitives, known collections).
-// output: *[]byte | *string | io.Writer.
-func Encode(input any, output any) error { ... }
-
-// Decode parses JSON into a Go value.
-// input: []byte | string | io.Reader.
-// output: fmt.Fielder | *string | *int64 | *float64 | *bool | *map[string]any | *[]any.
-func Decode(input any, output any) error { ... }
-```
-
-No `codec` interface, no `getJSONCodec()`, no build tags, no `instance` var.
-
-### 3.3 Reorganize test files
-
-- **Delete** `json_stlib_test.go` and `json_wasm_test.go` (test runners for platform split).
-- **Move** all remaining tests (e.g., `json_shared_test.go`) to a new `tests/` directory to keep the library more organized (e.g. rename to `tests/json_test.go` or split into `tests/encode_test.go` and `tests/decode_test.go`).
-- Update test files to call `Encode`/`Decode` directly instead of going through shared runner pattern.
-
-### 3.4 Verify no reflect and no build tags
+### 3.4 Verify clean codebase
 
 ```bash
-grep -r "\"reflect\"" *.go        # Must be zero in non-test files
-grep -r "//go:build" *.go          # Must be zero (no platform split)
-grep -r "syscall/js" *.go          # Must be zero
-grep -r "encoding/json" *.go       # Must be zero
+grep -r "\"reflect\"" *.go         # Zero in non-test files
+grep -r "//go:build" *.go          # Zero (no platform split)
+grep -r "syscall/js" *.go          # Zero
+grep -r "encoding/json" *.go       # Zero
 ```
 
 ### 3.5 Tests
-
-All existing tests from `json_shared_test.go` must pass. Run:
 
 ```bash
 gotest
@@ -580,11 +483,10 @@ gotest
 
 ### 4.1 Update `README.md`
 
-- New architecture description: single codec, zero reflect, platform-agnostic.
-- Updated API: supported input/output types.
-- `fmt.Fielder` integration: how structs are encoded/decoded via `Schema()`/`Values()`/`Pointers()`.
-- Breaking change notice: unsupported types now return error instead of using reflect fallback.
-- Migration guide: ensure all structs implement `Fielder` via `ormc`.
+- New architecture: single codec, zero reflect, platform-agnostic, Fielder-only.
+- Updated API signatures: `Encode(fmt.Fielder, any) error`, `Decode(any, fmt.Fielder) error`.
+- Breaking changes: structs must implement `Fielder` via `ormc`, no primitive encode/decode.
+- Migration guide.
 
 ### 4.2 Run full test suite
 
@@ -595,7 +497,7 @@ gotest
 ### 4.3 Publish
 
 ```bash
-gopush 'rewrite json codec: platform-agnostic, zero reflect, Fielder-based'
+gopush 'rewrite json codec: Fielder-only, zero reflect, single platform-agnostic implementation'
 ```
 
 ---
@@ -604,24 +506,34 @@ gopush 'rewrite json codec: platform-agnostic, zero reflect, Fielder-based'
 
 | File | Action |
 |------|--------|
-| `encode.go` (new) | Unified encoder: `Fielder` → JSON, primitives, collections |
-| `decode.go` (new) | Unified decoder: JSON parser + `Fielder` population via `Pointers()` |
-| `json.go` | Simplified: direct `Encode`/`Decode` functions, no codec interface |
+| `encode.go` (new) | Fielder → JSON via `fmt.Builder` + `fmt.JSONEscape` + `fmt.Convert` |
+| `decode.go` (new) | JSON → Fielder via `Pointers()` + `fmt.Convert` |
+| `parser.go` (new) | Minimal JSON tokenizer (~200 lines) |
+| `json.go` | Simplified or removed |
 | `codec_wasm.go` | **Deleted** |
 | `codec_stdlib.go` | **Deleted** |
 | `json_stlib_test.go` | **Deleted** |
 | `json_wasm_test.go` | **Deleted** |
-| `json_shared_test.go` | Moved to `tests/` directory and updated |
-| `README.md` | Updated architecture and API docs |
+| `json_shared_test.go` | Updated for Fielder-only API |
+| `README.md` | Rewritten |
 
 ## Breaking Changes
 
-1. **Struct types MUST implement `fmt.Fielder`** (via `ormc`). Passing a raw struct without `Fielder` to `Encode`/`Decode` returns an error.
-2. **No more `syscall/js` dependency** in WASM builds — browser JSON API is no longer used.
-3. **`encoding/json` no longer used** in stdlib builds — manual JSON building.
-4. **Removed `codec` interface** — internal implementation detail, not part of public API.
+1. **`Encode` signature**: `Encode(any, any)` → `Encode(fmt.Fielder, any) error`.
+2. **`Decode` signature**: `Decode(any, any)` → `Decode(any, fmt.Fielder)`.
+3. **Structs MUST implement `fmt.Fielder`** via `ormc`. Raw structs → error.
+4. **No primitive encode/decode** — only Fielder types. Use `fmt.Convert` for standalone conversions.
+5. **No `syscall/js`** — browser JSON API no longer used.
+6. **No `encoding/json`** — manual codec.
 
-## Downstream Impact
+## Code Reuse from `tinywasm/fmt`
 
-- **All packages using `json.Encode`/`json.Decode` with structs** must ensure those structs implement `fmt.Fielder`. Run `ormc` to generate the implementation.
-- **WASM binary size** should decrease significantly (no reflect, no js bridge for JSON).
+| What | fmt function | Used in |
+|------|-------------|---------|
+| String escaping | `fmt.JSONEscape(s, b)` | `encodeValue`, `encodeFielder` (keys) |
+| Zero-value check | `fmt.IsZero(v)` | `encodeFielder` (omitempty) |
+| Number → string | `fmt.Convert(v).String()` | `encodeValue` (int, float) |
+| String → int64 | `fmt.Convert(s).Int64()` | `parser.parseNumber` |
+| String → float64 | `fmt.Convert(s).Float64()` | `parser.parseNumber` |
+| String builder | `fmt.Builder` | Entire encoder |
+| Error creation | `fmt.Err(...)` | All error paths |
