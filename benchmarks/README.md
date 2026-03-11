@@ -35,37 +35,37 @@ The script will display:
 
 ## Source Files
 
-- [`clients/json/main.go`](clients/json/main.go) - Implementation using JSON
+- [`clients/tinyjson/main.go`](clients/tinyjson/main.go) - Implementation using JSON
 - [`clients/stdlib/main.go`](clients/stdlib/main.go) - Implementation using encoding/json (stdlib)
 
 Both files implement the same functionality to ensure fair comparison.
 
 ## Performance Results
 
-Last updated: 2025-12-11 12:59:16
+Last updated: 2025-05-15
 
-```
-BenchmarkTinyJSON_Encode       	      10	     69990 ns/op	     930 B/op	      24 allocs/op
-BenchmarkTinyJSON_Decode       	      10	     69990 ns/op	     704 B/op	      32 allocs/op
-BenchmarkTinyJSON_EncodeDecode 	      10	    119987 ns/op	    1634 B/op	      56 allocs/op
-BenchmarkStdlib_Encode         	      10	      9984 ns/op	     557 B/op	       9 allocs/op
-BenchmarkStdlib_Decode         	      10	     49997 ns/op	     968 B/op	      27 allocs/op
-BenchmarkStdlib_EncodeDecode   	      10	     60006 ns/op	    1525 B/op	      36 allocs/op
-PASS
-```
+### Go Benchmark (`go test -bench`)
 
-### Analysis
+| Benchmark | tinywasm/json | encoding/json | Δ allocs |
+|-----------|--------------|---------------|----------|
+| Encode    | 1565 ns/op 830 B/op 14 allocs | 542 ns/op 80 B/op 1 allocs | +13 |
+| Decode    | 2706 ns/op 1461 B/op 32 allocs | 2091 ns/op 376 B/op 8 allocs | +24 |
+| RoundTrip | 6124 ns/op 2329 B/op 47 allocs | 3727 ns/op 376 B/op 8 allocs | +39 |
 
-**JSON is 77% smaller** (27.2 KB vs 119 KB) making it ideal for web apps where bundle size matters. While stdlib is faster at encoding, JSON decode performance is competitive and the size advantage outweighs the microsecond differences for most browser applications.
+> Run: `go test -bench=. -benchmem ./tests/...`
 
-**Use JSON when:** Bundle size is critical, slow connections, or decode-heavy workloads.  
-**Use Stdlib when:** Encode-intensive operations or bundle size isn't a concern.
-
-## Binary Size Results
+### WASM Binary Size
 
 | Implementation | Binary Size (WASM + Gzip) |
 | :--- | :--- |
-| **JSON** | **27.2 KB** |
-| encoding/json (stdlib) | 119 KB |
+| **tinywasm/json** | **~27 KB** |
+| encoding/json (stdlib) | ~119 KB |
 
-See the [main README](../README.md#benchmarks) for detailed benchmark results and screenshots.
+### Analysis
+
+**tinywasm/json is 77% smaller** (~27 KB vs ~119 KB) making it ideal for web apps where bundle size matters. While stdlib is faster, tinywasm/json eliminates the `reflect` package, significantly reducing the final WASM binary size.
+
+**Use tinywasm/json when:** Bundle size is critical, slow connections, or running in restricted WASM environments.
+**Use Stdlib when:** Performance is the only metric and bundle size isn't a concern.
+
+See the [main README](../README.md#benchmarks) for detailed benchmark results.
