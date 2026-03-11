@@ -32,50 +32,7 @@ func Decode(input any, data fmt.Fielder) error {
 	}
 
 	p := &parser{data: raw}
-	parsed, err := p.parseValue()
-	if err != nil {
-		return err
-	}
-
-	obj, ok := parsed.(map[string]any)
-	if !ok {
-		return fmt.Err("json", "decode", "expected JSON object for Fielder")
-	}
-	return decodeFielder(obj, data)
-}
-
-func decodeFielder(obj map[string]any, f fmt.Fielder) error {
-	schema := f.Schema()
-	pointers := f.Pointers()
-
-	for i, field := range schema {
-		key, _ := parseJSONTag(field)
-		if key == "-" {
-			continue
-		}
-
-		val, exists := obj[key]
-		if !exists {
-			continue
-		}
-
-		ptr := pointers[i]
-
-		// Nested struct: recurse
-		if field.Type == fmt.FieldStruct {
-			if nested, ok := ptr.(fmt.Fielder); ok {
-				if innerObj, ok := val.(map[string]any); ok {
-					if err := decodeFielder(innerObj, nested); err != nil {
-						return err
-					}
-					continue
-				}
-			}
-		}
-
-		writeValue(ptr, field.Type, val)
-	}
-	return nil
+	return p.parseIntoFielder(data)
 }
 
 // writeValue writes a parsed JSON value into a Go pointer.
