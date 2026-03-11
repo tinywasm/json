@@ -10,6 +10,7 @@ A single, platform-agnostic JSON codec for Go that optimizes WebAssembly binary 
 - **Zero Reflection**: Uses type switches and `fmt.Fielder` instead of the `reflect` package.
 - **Platform-Agnostic**: Identical behavior on all platforms (WASM, Linux, macOS, etc.).
 - **TinyGo Compatible**: Optimized for minimal binary size and memory usage.
+- **Fielder-Only**: Only types implementing `fmt.Fielder` can be directly encoded or decoded.
 
 ## Usage
 
@@ -52,21 +53,21 @@ func main() {
 }
 ```
 
-### Primitives and Collections
-
-Supports `string`, `int`, `float64`, `bool`, `[]byte`, `[]string`, `[]int`, `[]any`, and `map[string]any`.
-
 ## API
 
-### `Encode(input any, output any) error`
+### `Encode(data fmt.Fielder, output any) error`
 
-- **input**: `fmt.Fielder`, primitives, or known collections.
+Serializes a `Fielder` to JSON.
+
+- **data**: Must implement `fmt.Fielder`.
 - **output**: `*[]byte`, `*string`, or `io.Writer`.
 
-### `Decode(input any, output any) error`
+### `Decode(input any, data fmt.Fielder) error`
+
+Parses JSON into a `Fielder`.
 
 - **input**: `[]byte`, `string`, or `io.Reader`.
-- **output**: `fmt.Fielder`, `*string`, `*int64`, `*float64`, `*bool`, `*map[string]any`, or `*[]any`.
+- **data**: Must implement `fmt.Fielder`.
 
 ---
 ## Contributing

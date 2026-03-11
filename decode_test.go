@@ -6,164 +6,227 @@ import (
 	"testing"
 )
 
-func TestDecodeFielderSimple(t *testing.T) {
+func TestDecodeSimple(t *testing.T) {
 	var name string
 	var age int64
 	var active bool
 	m := &mockFielder{
 		schema: []fmt.Field{
-			{Name: "Name", Type: fmt.FieldText},
-			{Name: "Age", Type: fmt.FieldInt},
-			{Name: "Active", Type: fmt.FieldBool},
+			{Name: "Name", Type: fmt.FieldText, JSON: "name"},
+			{Name: "Age", Type: fmt.FieldInt, JSON: "age"},
+			{Name: "Active", Type: fmt.FieldBool, JSON: "active"},
 		},
 		pointers: []any{&name, &age, &active},
 	}
-
-	js := `{"Name":"John Doe","Age":30,"Active":true}`
-	if err := Decode(js, m); err != nil {
-		t.Fatalf("Decode failed: %v", err)
+	input := `{"name":"Alice","age":30,"active":true}`
+	if err := Decode(input, m); err != nil {
+		t.Fatal(err)
 	}
-
-	if name != "John Doe" {
-		t.Errorf("expected name John Doe, got %s", name)
-	}
-	if age != 30 {
-		t.Errorf("expected age 30, got %d", age)
-	}
-	if active != true {
-		t.Errorf("expected active true, got %v", active)
+	if name != "Alice" || age != 30 || active != true {
+		t.Errorf("got %s, %d, %v", name, age, active)
 	}
 }
 
-func TestDecodeFielderNested(t *testing.T) {
+func TestDecodeNested(t *testing.T) {
 	var city string
 	inner := &mockFielder{
 		schema: []fmt.Field{
-			{Name: "City", Type: fmt.FieldText},
+			{Name: "City", Type: fmt.FieldText, JSON: "city"},
 		},
 		pointers: []any{&city},
 	}
-
 	var user string
 	outer := &mockFielder{
 		schema: []fmt.Field{
-			{Name: "User", Type: fmt.FieldText},
-			{Name: "Address", Type: fmt.FieldStruct},
+			{Name: "User", Type: fmt.FieldText, JSON: "user"},
+			{Name: "Address", Type: fmt.FieldStruct, JSON: "address"},
 		},
 		pointers: []any{&user, inner},
 	}
-
-	js := `{"User":"Alice","Address":{"City":"New York"}}`
-	if err := Decode(js, outer); err != nil {
-		t.Fatalf("Decode failed: %v", err)
+	input := `{"user":"Alice","address":{"city":"Paris"}}`
+	if err := Decode(input, outer); err != nil {
+		t.Fatal(err)
 	}
-
-	if user != "Alice" {
-		t.Errorf("expected user Alice, got %s", user)
-	}
-	if city != "New York" {
-		t.Errorf("expected city New York, got %s", city)
+	if user != "Alice" || city != "Paris" {
+		t.Errorf("got %s, %s", user, city)
 	}
 }
 
-func TestDecodeFielderJSONKey(t *testing.T) {
-	var fullName string
+func TestDecodeJSONKey(t *testing.T) {
+	var firstName string
 	m := &mockFielder{
 		schema: []fmt.Field{
-			{Name: "FullName", Type: fmt.FieldText, JSON: "full_name"},
+			{Name: "FirstName", Type: fmt.FieldText, JSON: "first_name"},
 		},
-		pointers: []any{&fullName},
+		pointers: []any{&firstName},
 	}
-
-	js := `{"full_name":"John Doe"}`
-	if err := Decode(js, m); err != nil {
-		t.Fatalf("Decode failed: %v", err)
+	input := `{"first_name":"Alice"}`
+	if err := Decode(input, m); err != nil {
+		t.Fatal(err)
 	}
-
-	if fullName != "John Doe" {
-		t.Errorf("expected FullName John Doe, got %s", fullName)
+	if firstName != "Alice" {
+		t.Errorf("got %s", firstName)
 	}
 }
 
-func TestDecodePrimitives(t *testing.T) {
-	// String
-	var s string
-	if err := Decode(`"hello"`, &s); err != nil || s != "hello" {
-		t.Errorf("Decode string failed: %v, %s", err, s)
+func TestDecodeJSONExclude(t *testing.T) {
+	secret := "initial"
+	m := &mockFielder{
+		schema: []fmt.Field{
+			{Name: "Secret", Type: fmt.FieldText, JSON: "-"},
+		},
+		pointers: []any{&secret},
 	}
-
-	// Int64
-	var i int64
-	if err := Decode(`123`, &i); err != nil || i != 123 {
-		t.Errorf("Decode int64 failed: %v, %d", err, i)
+	input := `{"Secret":"new"}`
+	if err := Decode(input, m); err != nil {
+		t.Fatal(err)
 	}
-
-	// Float64
-	var f float64
-	if err := Decode(`3.14`, &f); err != nil || (f < 3.139 || f > 3.141) {
-		t.Errorf("Decode float64 failed: %v, %f", err, f)
-	}
-
-	// Bool
-	var b bool
-	if err := Decode(`true`, &b); err != nil || b != true {
-		t.Errorf("Decode bool failed: %v, %v", err, b)
+	if secret != "initial" {
+		t.Errorf("secret changed to %s", secret)
 	}
 }
 
-func TestDecodeArrays(t *testing.T) {
-	var arr []any
-	if err := Decode(`["a",1,true]`, &arr); err != nil {
-		t.Fatalf("Decode array failed: %v", err)
+func TestDecodeMissingField(t *testing.T) {
+	age := int64(20)
+	m := &mockFielder{
+		schema: []fmt.Field{
+			{Name: "Age", Type: fmt.FieldInt, JSON: "age"},
+		},
+		pointers: []any{&age},
 	}
-	if len(arr) != 3 {
-		t.Fatalf("expected length 3, got %d", len(arr))
+	input := `{}`
+	if err := Decode(input, m); err != nil {
+		t.Fatal(err)
 	}
-	if arr[0] != "a" || arr[1] != int64(1) || arr[2] != true {
-		t.Errorf("unexpected array content: %v", arr)
-	}
-}
-
-func TestDecodeObjects(t *testing.T) {
-	var m map[string]any
-	if err := Decode(`{"a":1,"b":"c"}`, &m); err != nil {
-		t.Fatalf("Decode object failed: %v", err)
-	}
-	if m["a"] != int64(1) || m["b"] != "c" {
-		t.Errorf("unexpected map content: %v", m)
+	if age != 20 {
+		t.Errorf("age changed to %d", age)
 	}
 }
 
-func TestDecodeInputs(t *testing.T) {
-	js := `"hello"`
-
-	// From string
-	var s1 string
-	if err := Decode(js, &s1); err != nil || s1 != "hello" {
-		t.Errorf("Decode from string failed: %v", err)
+func TestDecodeExtraField(t *testing.T) {
+	var name string
+	m := &mockFielder{
+		schema: []fmt.Field{
+			{Name: "Name", Type: fmt.FieldText, JSON: "name"},
+		},
+		pointers: []any{&name},
 	}
-
-	// From bytes
-	var s2 string
-	if err := Decode([]byte(js), &s2); err != nil || s2 != "hello" {
-		t.Errorf("Decode from bytes failed: %v", err)
+	input := `{"name":"Alice","extra":"ignore"}`
+	if err := Decode(input, m); err != nil {
+		t.Fatal(err)
 	}
+	if name != "Alice" {
+		t.Errorf("got %s", name)
+	}
+}
 
-	// From reader
-	var s3 string
-	if err := Decode(bytes.NewReader([]byte(js)), &s3); err != nil || s3 != "hello" {
-		t.Errorf("Decode from reader failed: %v", err)
+func TestDecodeIntFromFloat(t *testing.T) {
+	var age int64
+	m := &mockFielder{
+		schema: []fmt.Field{
+			{Name: "Age", Type: fmt.FieldInt, JSON: "age"},
+		},
+		pointers: []any{&age},
+	}
+	input := `{"age":30.0}`
+	if err := Decode(input, m); err != nil {
+		t.Fatal(err)
+	}
+	if age != 30 {
+		t.Errorf("got %d", age)
+	}
+}
+
+func TestDecodeFloatFromInt(t *testing.T) {
+	var price float64
+	m := &mockFielder{
+		schema: []fmt.Field{
+			{Name: "Price", Type: fmt.FieldFloat, JSON: "price"},
+		},
+		pointers: []any{&price},
+	}
+	input := `{"price":100}`
+	if err := Decode(input, m); err != nil {
+		t.Fatal(err)
+	}
+	if price != 100.0 {
+		t.Errorf("got %f", price)
+	}
+}
+
+func TestDecodeBytes(t *testing.T) {
+	var data []byte
+	m := &mockFielder{
+		schema: []fmt.Field{
+			{Name: "Data", Type: fmt.FieldBlob, JSON: "data"},
+		},
+		pointers: []any{&data},
+	}
+	input := `{"data":"hello"}`
+	if err := Decode(input, m); err != nil {
+		t.Fatal(err)
+	}
+	if string(data) != "hello" {
+		t.Errorf("got %s", string(data))
+	}
+}
+
+func TestDecodeFromReader(t *testing.T) {
+	var name string
+	m := &mockFielder{
+		schema: []fmt.Field{
+			{Name: "Name", Type: fmt.FieldText, JSON: "name"},
+		},
+		pointers: []any{&name},
+	}
+	input := bytes.NewReader([]byte(`{"name":"Alice"}`))
+	if err := Decode(input, m); err != nil {
+		t.Fatal(err)
+	}
+	if name != "Alice" {
+		t.Errorf("got %s", name)
 	}
 }
 
 func TestDecodeStringEscapes(t *testing.T) {
-	js := `"quote: \", backslash: \\, newline: \n, unicode: \u0041"`
-	var s string
-	if err := Decode(js, &s); err != nil {
-		t.Fatalf("Decode failed: %v", err)
+	var msg string
+	m := &mockFielder{
+		schema: []fmt.Field{
+			{Name: "Msg", Type: fmt.FieldText, JSON: "msg"},
+		},
+		pointers: []any{&msg},
 	}
-	expected := "quote: \", backslash: \\, newline: \n, unicode: A"
-	if s != expected {
-		t.Errorf("expected %q, got %q", expected, s)
+	input := `{"msg":"hello \"world\"\n\r\t\\"}`
+	if err := Decode(input, m); err != nil {
+		t.Fatal(err)
+	}
+	expected := "hello \"world\"\n\r\t\\"
+	if msg != expected {
+		t.Errorf("expected %q, got %q", expected, msg)
+	}
+}
+
+func TestDecodeNull(t *testing.T) {
+	name := "Alice"
+	m := &mockFielder{
+		schema: []fmt.Field{
+			{Name: "Name", Type: fmt.FieldText, JSON: "name"},
+		},
+		pointers: []any{&name},
+	}
+	input := `{"name":null}`
+	if err := Decode(input, m); err != nil {
+		t.Fatal(err)
+	}
+	if name != "Alice" {
+		t.Errorf("name changed to %s", name)
+	}
+}
+
+func TestDecodeInvalidJSON(t *testing.T) {
+	m := &mockFielder{}
+	input := `{"name":`
+	if err := Decode(input, m); err == nil {
+		t.Error("expected error for invalid JSON")
 	}
 }
