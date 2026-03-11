@@ -66,65 +66,46 @@ func (p *parser) parseString() (string, error) {
 		return "", fmt.Err("json", "decode", "expected quote")
 	}
 
-	var b []byte
+	var b fmt.Builder
 	for p.pos < len(p.data) {
 		c := p.next()
 		if c == '"' {
-			return string(b), nil
+			return b.String(), nil
 		}
 		if c == '\\' {
 			c = p.next()
 			switch c {
 			case '"':
-				b = append(b, '"')
+				b.WriteByte('"')
 			case '\\':
-				b = append(b, '\\')
+				b.WriteByte('\\')
 			case '/':
-				b = append(b, '/')
+				b.WriteByte('/')
 			case 'b':
-				b = append(b, '\b')
+				b.WriteByte('\b')
 			case 'f':
-				b = append(b, '\f')
+				b.WriteByte('\f')
 			case 'n':
-				b = append(b, '\n')
+				b.WriteByte('\n')
 			case 'r':
-				b = append(b, '\r')
+				b.WriteByte('\r')
 			case 't':
-				b = append(b, '\t')
+				b.WriteByte('\t')
 			case 'u':
 				if p.pos+4 > len(p.data) {
 					return "", fmt.Err("json", "decode", "invalid unicode escape")
 				}
-				hex := string(p.data[p.pos : p.pos+4])
+				val, _ := fmt.Convert(string(p.data[p.pos : p.pos+4])).Int64(16)
 				p.pos += 4
-				val := decodeHex(hex)
-				// Simplified unicode handling: just handles ASCII range for now
-				// as per the minimal requirement and TinyGo constraints
-				b = append(b, byte(val))
+				b.WriteByte(byte(val))
 			default:
 				return "", fmt.Err("json", "decode", "invalid escape sequence")
 			}
 		} else {
-			b = append(b, c)
+			b.WriteByte(c)
 		}
 	}
 	return "", fmt.Err("json", "decode", "unexpected EOF")
-}
-
-func decodeHex(s string) int {
-	var res int
-	for i := 0; i < len(s); i++ {
-		res <<= 4
-		c := s[i]
-		if c >= '0' && c <= '9' {
-			res += int(c - '0')
-		} else if c >= 'a' && c <= 'f' {
-			res += int(c - 'a' + 10)
-		} else if c >= 'A' && c <= 'F' {
-			res += int(c - 'A' + 10)
-		}
-	}
-	return res
 }
 
 func (p *parser) parseNumber() (any, error) {
@@ -197,6 +178,84 @@ func (p *parser) parseArray() ([]any, error) {
 		}
 	}
 	return res, nil
+}
+
+// parseIntoFielder parses a JSON object directly into the Fielder.
+// Eliminates the need for map[string]any as an intermediary.
+func (p *parser) parseIntoFielder(f fmt.Fielder) error {
+	p.skipWhitespace()
+	if p.next() != '{' {
+		return fmt.Err("json", "decode", "expected {")
+	}
+
+	schema := f.Schema()
+	pointers := f.Pointers()
+
+	p.skipWhitespace()
+	if p.peek() == '}' {
+		p.next()
+		return nil
+	}
+
+	for {
+		p.skipWhitespace()
+		key, err := p.parseString()
+		if err != nil {
+			return err
+		}
+		p.skipWhitespace()
+		if p.next() != ':' {
+			return fmt.Err("json", "decode", "expected :")
+		}
+
+		// Search for the field in the schema
+		fieldIdx := -1
+		for i, field := range schema {
+			k, _ := parseJSONTag(field)
+			if k == key {
+				fieldIdx = i
+				break
+			}
+		}
+
+		if fieldIdx < 0 {
+			// Unknown field: parse and discard
+			if _, err := p.parseValue(); err != nil {
+				return err
+			}
+		} else {
+			field := schema[fieldIdx]
+			ptr := pointers[fieldIdx]
+
+			if field.Type == fmt.FieldStruct {
+				if nested, ok := ptr.(fmt.Fielder); ok {
+					if err := p.parseIntoFielder(nested); err != nil {
+						return err
+					}
+				} else {
+					if _, err := p.parseValue(); err != nil {
+						return err
+					}
+				}
+			} else {
+				val, err := p.parseValue()
+				if err != nil {
+					return err
+				}
+				writeValue(ptr, field.Type, val)
+			}
+		}
+
+		p.skipWhitespace()
+		c := p.next()
+		if c == '}' {
+			break
+		}
+		if c != ',' {
+			return fmt.Err("json", "decode", "expected , or }")
+		}
+	}
+	return nil
 }
 
 func (p *parser) parseObject() (map[string]any, error) {
