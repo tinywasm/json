@@ -1,6 +1,6 @@
-# PLAN: Fielder v2 Migration + Performance (tinywasm/json)
+# PLAN: Decode Zero-Alloc — Corrección de Performance (tinywasm/json)
 
-← [README](../README.md) | Depends on: [fmt PLAN_FIELDER_V2](../../fmt/docs/PLAN_FIELDER_V2.md)
+← [README](../README.md) | Depends on: [fmt PLAN.md](../../fmt/docs/PLAN.md)
 
 ## Development Rules
 
@@ -15,7 +15,7 @@
 
 ## Prerequisite
 
-Update `go.mod` to the new `tinywasm/fmt` version that removes `Values()` from Fielder:
+Update `go.mod` to the new `tinywasm/fmt` version with `LoadBytes` + `GetStringZeroCopy` fix:
 
 ```bash
 go get github.com/tinywasm/fmt@latest
@@ -23,495 +23,300 @@ go get github.com/tinywasm/fmt@latest
 
 ## Context
 
-Current benchmark (struct with 4 fields: 2 string, 1 int64, 1 float64):
+Encode está optimizado (2 allocs, +1 vs stdlib). Decode tiene **20 allocs** vs 8 de stdlib.
 
-| Benchmark | tinywasm/json | encoding/json | Δ allocs |
-|-----------|--------------|---------------|----------|
-| Encode    | 1596 ns/op · 14 allocs | 548 ns/op · 1 alloc | +13 |
-| Decode    | 2708 ns/op · 32 allocs | 2145 ns/op · 8 allocs | +24 |
+### Diagnóstico con profiler (`go tool pprof -top -cum`)
 
-**Target after this plan:** Encode ≤ 2 allocs, Decode ≤ 5 allocs.
+| Fuente | % memoria | Causa raíz |
+|--------|-----------|------------|
+| `fmt.GetConv` (pool New) | **71.4%** | `Convert(s).Int64()` — variadic boxing + Conv leak del pool |
+| `parseValue` boxing | 4.1% | Valores retornados como `any` y desboxeados en `writeValue` |
+| `parseNumber` string copy | 5.6% | `string(p.data[start:p.pos])` innecesario |
 
-Root causes of excess allocations:
-1. `Values() []any` boxes strings into interface → heap escape (Encode)
-2. `Schema()` allocates a new slice per call (ormc fix, not this plan)
-3. `parseString()` uses `fmt.Builder` for EVERY string, even simple ASCII (Decode)
-4. JSON keys parsed as strings then discarded — pure waste (Decode)
-5. `Encode` creates a new Builder instead of using the pool (Encode)
-6. `fmt.Convert(val).String()` for numbers boxes the value into `any` (Encode)
+### Target
 
----
-
-## Stage 1: Migrate Encode to use Pointers (remove Values dependency)
-
-**File:** `encode.go`
-
-### 1.1 Replace `encodeFielder` to read from Pointers
-
-```go
-func encodeFielder(b *fmt.Conv, f fmt.Fielder) error {
-	schema := f.Schema()
-	ptrs := f.Pointers()
-	if ptrs == nil && schema != nil {
-		return fmt.Err("json", "encode", "failed to get pointers")
-	}
-	b.WriteByte('{')
-
-	first := true
-	for i, field := range schema {
-		key, omitempty := parseJSONTag(field)
-		if key == "-" {
-			continue
-		}
-
-		ptr := ptrs[i]
-
-		if omitempty && isZeroPtr(ptr, field.Type) {
-			continue
-		}
-
-		if !first {
-			b.WriteByte(',')
-		}
-		first = false
-
-		b.WriteByte('"')
-		fmt.JSONEscape(key, b)
-		b.WriteByte('"')
-		b.WriteByte(':')
-
-		encodeFromPtr(b, ptr, field.Type)
-	}
-
-	b.WriteByte('}')
-	return nil
-}
-```
-
-### 1.2 Replace `encodeValue` with `encodeFromPtr`
-
-```go
-// encodeFromPtr writes a JSON value by reading directly from a typed pointer.
-// Avoids interface boxing — the value is never wrapped in any.
-func encodeFromPtr(b *fmt.Conv, ptr any, ft fmt.FieldType) {
-	switch ft {
-	case fmt.FieldText:
-		if p, ok := ptr.(*string); ok {
-			b.WriteByte('"')
-			fmt.JSONEscape(*p, b)
-			b.WriteByte('"')
-		} else {
-			b.WriteString("null")
-		}
-	case fmt.FieldInt:
-		switch p := ptr.(type) {
-		case *int64:
-			b.WriteInt(*p)
-		case *int:
-			b.WriteInt(int64(*p))
-		case *int32:
-			b.WriteInt(int64(*p))
-		case *uint:
-			b.WriteInt(int64(*p))
-		case *uint32:
-			b.WriteInt(int64(*p))
-		case *uint64:
-			b.WriteInt(int64(*p))
-		default:
-			b.WriteByte('0')
-		}
-	case fmt.FieldFloat:
-		switch p := ptr.(type) {
-		case *float64:
-			b.WriteFloat(*p)
-		case *float32:
-			b.WriteFloat(float64(*p))
-		default:
-			b.WriteByte('0')
-		}
-	case fmt.FieldBool:
-		if p, ok := ptr.(*bool); ok && *p {
-			b.WriteString("true")
-		} else {
-			b.WriteString("false")
-		}
-	case fmt.FieldBlob:
-		if p, ok := ptr.(*[]byte); ok {
-			b.WriteByte('"')
-			fmt.JSONEscape(string(*p), b)
-			b.WriteByte('"')
-		} else {
-			b.WriteString("null")
-		}
-	case fmt.FieldStruct:
-		if nested, ok := ptr.(fmt.Fielder); ok {
-			encodeFielder(b, nested)
-		} else {
-			b.WriteString("null")
-		}
-	default:
-		b.WriteString("null")
-	}
-}
-```
-
-### 1.3 Add `isZeroPtr` (replaces `fmt.IsZero(val)`)
-
-```go
-// isZeroPtr checks if a field value is zero by reading through its pointer.
-func isZeroPtr(ptr any, ft fmt.FieldType) bool {
-	switch ft {
-	case fmt.FieldText:
-		if p, ok := ptr.(*string); ok {
-			return *p == ""
-		}
-	case fmt.FieldInt:
-		switch p := ptr.(type) {
-		case *int64:
-			return *p == 0
-		case *int:
-			return *p == 0
-		case *int32:
-			return *p == 0
-		}
-	case fmt.FieldFloat:
-		switch p := ptr.(type) {
-		case *float64:
-			return *p == 0
-		case *float32:
-			return *p == 0
-		}
-	case fmt.FieldBool:
-		if p, ok := ptr.(*bool); ok {
-			return !*p
-		}
-	case fmt.FieldBlob:
-		if p, ok := ptr.(*[]byte); ok {
-			return len(*p) == 0
-		}
-	}
-	return false
-}
-```
-
-### 1.4 Use pooled Conv in `Encode`
-
-```go
-func Encode(data fmt.Fielder, output any) error {
-	b := fmt.GetConv()
-	defer b.PutConv()
-
-	if err := encodeFielder(b, data); err != nil {
-		return err
-	}
-
-	switch out := output.(type) {
-	case *[]byte:
-		*out = b.Bytes()
-	case *string:
-		*out = b.String()
-	case io.Writer:
-		_, err := out.Write(b.OutBytes())
-		return err
-	default:
-		return fmt.Err("json", "encode", "output must be *[]byte, *string, or io.Writer")
-	}
-	return nil
-}
-```
-
-**Note:** Verify that `Conv` has a `Bytes()` method and an `OutBytes()` method (returns `out[:outLen]` without copy). If not, use `[]byte(b.String())` as fallback and file an issue for `fmt`.
-
-### 1.5 Delete old `encodeValue` function
-
-Remove the entire `encodeValue(b *fmt.Builder, v any)` function — replaced by `encodeFromPtr`.
+| Operación | Actual | Target | stdlib |
+|-----------|--------|--------|--------|
+| Decode | 20 allocs | **3 allocs** | 8 allocs |
 
 ---
 
-## Stage 2: Optimize parseString (fast path for simple strings)
+## Stage 1: Replace `parseNumber` calls with `fmt.LoadBytes` path
 
 **File:** `parser.go`
 
-### 2.1 Replace `parseString` with fast path
+Add a method that parses a number from the current position using `fmt.LoadBytes` — reuses all existing `parseIntBase`/`parseFloatBase` logic in fmt with **0 allocations**.
 
 ```go
-// parseString parses a JSON string. The opening '"' must already be consumed.
-// Fast path: if no escape sequences, returns string(data[start:end]) — 1 alloc.
-// Slow path: uses Conv builder for strings with escapes — 2 allocs.
-func (p *parser) parseString() (string, error) {
+// parseNumberInto parses a JSON number directly into a typed pointer.
+// Uses fmt.GetConv + LoadBytes + Int64/Float64 + PutConv — 0 allocations
+// (reuses fmt's existing parseIntBase/parseFloatBase via pool).
+func (p *parser) parseNumberInto(ptr any, ft fmt.FieldType) error {
+	p.skipWhitespace()
 	start := p.pos
+	isFloat := false
 	for p.pos < len(p.data) {
 		c := p.data[p.pos]
-		if c == '"' {
-			s := string(p.data[start:p.pos])
-			p.pos++ // consume closing '"'
-			return s, nil
-		}
-		if c == '\\' {
-			// Escape found — fall back to slow path with builder
-			return p.parseStringEscape(start)
-		}
-		p.pos++
-	}
-	return "", fmt.Err("json", "decode", "unexpected EOF")
-}
-
-// parseStringEscape handles strings with escape sequences.
-// Called when parseString encounters '\' at some position.
-// start is the position of the first character after the opening '"'.
-func (p *parser) parseStringEscape(start int) (string, error) {
-	b := fmt.GetConv()
-	defer b.PutConv()
-	// Write the part before the escape that was already scanned
-	for i := start; i < p.pos; i++ {
-		b.WriteByte(p.data[i])
-	}
-	// Continue parsing with escape handling
-	for p.pos < len(p.data) {
-		c := p.data[p.pos]
-		p.pos++
-		if c == '"' {
-			return b.String(), nil
-		}
-		if c == '\\' {
-			if p.pos >= len(p.data) {
-				return "", fmt.Err("json", "decode", "unexpected EOF")
-			}
-			esc := p.data[p.pos]
+		if (c >= '0' && c <= '9') || c == '-' || c == '+' {
 			p.pos++
-			switch esc {
-			case '"':
-				b.WriteByte('"')
-			case '\\':
-				b.WriteByte('\\')
-			case '/':
-				b.WriteByte('/')
-			case 'b':
-				b.WriteByte('\b')
-			case 'f':
-				b.WriteByte('\f')
-			case 'n':
-				b.WriteByte('\n')
-			case 'r':
-				b.WriteByte('\r')
-			case 't':
-				b.WriteByte('\t')
-			case 'u':
-				if p.pos+4 > len(p.data) {
-					return "", fmt.Err("json", "decode", "invalid unicode escape")
-				}
-				val, _ := fmt.Convert(string(p.data[p.pos : p.pos+4])).Int64(16)
-				p.pos += 4
-				b.WriteByte(byte(val))
-			default:
-				return "", fmt.Err("json", "decode", "invalid escape sequence")
-			}
+		} else if c == '.' || c == 'e' || c == 'E' {
+			isFloat = true
+			p.pos++
 		} else {
-			b.WriteByte(c)
+			break
 		}
 	}
-	return "", fmt.Err("json", "decode", "unexpected EOF")
-}
-```
-
----
-
-## Stage 3: Zero-alloc key matching in parseIntoFielder
-
-**File:** `parser.go`
-
-### 3.1 Add `matchFieldIndex` method
-
-```go
-// matchFieldIndex matches the current JSON key (bytes between pos and closing '"')
-// against schema field names WITHOUT allocating a string.
-// Returns field index or -1 if not found. Advances pos past the closing '"'.
-// Falls back to parseString if escape sequences are found.
-func (p *parser) matchFieldIndex(schema []fmt.Field) (int, error) {
-	start := p.pos
-	for p.pos < len(p.data) {
-		c := p.data[p.pos]
-		if c == '"' {
-			keyBytes := p.data[start:p.pos]
-			p.pos++ // consume closing '"'
-			for i, field := range schema {
-				k, _ := parseJSONTag(field)
-				if len(k) == len(keyBytes) && matchBytesStr(k, keyBytes) {
-					return i, nil
-				}
-			}
-			return -1, nil // unknown field
-		}
-		if c == '\\' {
-			// Rare: escaped key — fall back to allocating path
-			key, err := p.parseStringEscape(start)
-			if err != nil {
-				return -1, err
-			}
-			for i, field := range schema {
-				k, _ := parseJSONTag(field)
-				if k == key {
-					return i, nil
-				}
-			}
-			return -1, nil
-		}
-		p.pos++
+	if p.pos == start {
+		return fmt.Err("json", "decode", "expected number")
 	}
-	return -1, fmt.Err("json", "decode", "unexpected EOF in key")
-}
 
-// matchBytesStr compares a string against a byte slice without allocation.
-func matchBytesStr(s string, b []byte) bool {
-	for i := 0; i < len(s); i++ {
-		if s[i] != b[i] {
-			return false
-		}
-	}
-	return true
-}
-```
+	numBytes := p.data[start:p.pos]
 
-### 3.2 Update `parseIntoFielder` to use `matchFieldIndex`
+	c := fmt.GetConv()
+	c.LoadBytes(numBytes)
 
-Replace the key parsing block (lines 197-218 approximately):
-
-```go
-// BEFORE:
-//   if p.next() != '"' { return error }
-//   key, err := p.parseString()
-//   ... linear search by key string ...
-
-// AFTER:
-	for {
-		p.skipWhitespace()
-		if p.next() != '"' {
-			return fmt.Err("json", "decode", "expected quote")
-		}
-
-		fieldIdx, err := p.matchFieldIndex(schema)
+	if ft == fmt.FieldFloat || isFloat {
+		v, err := c.Float64()
+		c.PutConv()
 		if err != nil {
 			return err
 		}
-
-		p.skipWhitespace()
-		if p.next() != ':' {
-			return fmt.Err("json", "decode", "expected :")
-		}
-
-		if fieldIdx < 0 {
-			if _, err := p.parseValue(); err != nil {
-				return err
+		if ft == fmt.FieldFloat {
+			switch fp := ptr.(type) {
+			case *float64:
+				*fp = v
+			case *float32:
+				*fp = float32(v)
 			}
 		} else {
-			// ... existing field type dispatch (unchanged) ...
+			// FieldInt but JSON has decimal/exponent — truncate
+			switch ip := ptr.(type) {
+			case *int64:
+				*ip = int64(v)
+			case *int:
+				*ip = int(v)
+			case *int32:
+				*ip = int32(v)
+			}
 		}
-
-		// ... existing comma/brace check (unchanged) ...
+	} else {
+		v, err := c.Int64()
+		c.PutConv()
+		if err != nil {
+			return err
+		}
+		switch ip := ptr.(type) {
+		case *int64:
+			*ip = v
+		case *int:
+			*ip = int(v)
+		case *int32:
+			*ip = int32(v)
+		}
 	}
-```
-
----
-
-## Stage 4: Update Decode input handling
-
-**File:** `decode.go`
-
-### 4.1 Avoid `[]byte(in)` copy for string input
-
-Currently `Decode` converts string input to `[]byte`, causing 1 alloc. Since the parser
-only reads bytes and never modifies the data, we can use `unsafe` to avoid the copy:
-
-```go
-func Decode(input any, data fmt.Fielder) error {
-	var raw []byte
-	switch in := input.(type) {
-	case []byte:
-		raw = in
-	case string:
-		// Avoid copy: parser is read-only, never modifies data.
-		raw = unsafe.Slice(unsafe.StringData(in), len(in))
-	case io.Reader:
-		// ... existing io.Reader handling ...
-	}
-	p := parser{data: raw}
-	return p.parseIntoFielder(data)
+	return nil
 }
 ```
 
-**Note:** `unsafe.StringData` and `unsafe.Slice` are available since Go 1.20. Both Go and TinyGo support them. The parser MUST NOT modify `p.data` — verify this is the case (it already is: parser only reads via `p.data[p.pos]`).
-
-If the team prefers to avoid `unsafe`, skip this optimization — it saves only 1 alloc.
+**Alloc analysis:**
+- `fmt.GetConv()` → from pool, 0 allocs (steady state)
+- `c.LoadBytes(numBytes)` → copies to existing 64-byte buffer, 0 allocs
+- `c.Int64()`/`c.Float64()` → uses `GetStringZeroCopy` internally (fmt fix), 0 allocs
+- `c.PutConv()` → returns to pool, 0 allocs
+- **Total: 0 allocs per number field**
 
 ---
 
-## Stage 5: Update tests
+## Stage 2: Add `parseIntoPtr` — bypass `parseValue`/`writeValue` boxing
 
-### 5.1 Remove `Values()` from all test mocks
+**File:** `parser.go`
 
-Search and update all files in `tests/`:
+```go
+// parseIntoPtr parses a JSON value directly into a typed pointer.
+// Bypasses parseValue()/writeValue() to avoid boxing values into any.
+func (p *parser) parseIntoPtr(ptr any, ft fmt.FieldType) error {
+	p.skipWhitespace()
 
-```bash
-grep -rn "func.*Values().*\[\]any" tests/
+	// Handle JSON null for any type
+	if p.peek() == 'n' {
+		return p.parseNull()
+	}
+
+	switch ft {
+	case fmt.FieldText:
+		if p.next() != '"' {
+			return fmt.Err("json", "decode", "expected string")
+		}
+		s, err := p.parseString()
+		if err != nil {
+			return err
+		}
+		if sp, ok := ptr.(*string); ok {
+			*sp = s
+		}
+		return nil
+
+	case fmt.FieldInt, fmt.FieldFloat:
+		return p.parseNumberInto(ptr, ft)
+
+	case fmt.FieldBool:
+		b, err := p.parseBool()
+		if err != nil {
+			return err
+		}
+		if bp, ok := ptr.(*bool); ok {
+			*bp = b
+		}
+		return nil
+
+	case fmt.FieldBlob:
+		if p.next() != '"' {
+			return fmt.Err("json", "decode", "expected string for blob")
+		}
+		s, err := p.parseString()
+		if err != nil {
+			return err
+		}
+		if bp, ok := ptr.(*[]byte); ok {
+			*bp = []byte(s)
+		}
+		return nil
+	}
+
+	// Fallback for unknown field types
+	_, err := p.parseValue()
+	return err
+}
 ```
 
-Every mock implementing `Fielder` must remove its `Values()` method.
+---
 
-### 5.2 Update benchmark struct
+## Stage 3: Wire `parseIntoPtr` into `parseIntoFielder`
 
-**File:** `tests/bench_encode_test.go`
+**File:** `parser.go`
 
-Remove `Values()` method from `benchUser`. Keep only `Schema()` and `Pointers()`.
+Replace the generic `parseValue()` + `writeValue()` path in `parseIntoFielder`:
 
-### 5.3 Verify all tests pass
+```go
+// BEFORE (current code, lines ~315-321):
+		} else {
+			val, err := p.parseValue()
+			if err != nil {
+				return err
+			}
+			writeValue(ptr, field.Type, val)
+		}
+
+// AFTER:
+		} else {
+			if err := p.parseIntoPtr(ptr, field.Type); err != nil {
+				return err
+			}
+		}
+```
+
+**Note:** `parseValue()`, `writeValue()`, and `parseNumber()` remain unchanged — they're still used by:
+- `parseObject()` (generic `map[string]any` parsing)
+- `parseArray()` (generic `[]any` parsing)
+- Unknown field discard in `parseIntoFielder` (line 298)
+
+---
+
+## Stage 4: Stack-allocate parser
+
+**File:** `decode.go`
+
+```go
+// BEFORE (line 36):
+	p := &parser{data: raw}
+	return p.parseIntoFielder(data)
+
+// AFTER:
+	p := parser{data: raw}
+	return p.parseIntoFielder(data)
+```
+
+Parser methods use `*parser` receiver but never store the pointer externally.
+Escape analysis should keep `p` on the stack (saves 1 alloc).
+
+Verify:
+```bash
+go build -gcflags='-m' 2>&1 | grep 'parser.*escapes'
+```
+
+---
+
+## Stage 5: Run tests and benchmarks
 
 ```bash
 gotest
 ```
 
-### 5.4 Run benchmarks and compare
+Then:
 
 ```bash
-go test -bench=. -benchmem -count=5 ./tests/... 2>&1 | tee /tmp/bench_v2.txt
+go test -bench=. -benchmem -count=5 ./tests/... 2>&1 | tee /tmp/bench_fix.txt
 ```
 
 Expected results:
-- Encode: ≤ 2 allocs/op (down from 14)
-- Decode: ≤ 5 allocs/op (down from 32)
+
+| Benchmark | Before | After |
+|-----------|--------|-------|
+| Encode | 2 allocs | 2 allocs (unchanged) |
+| Decode | 20 allocs | **3 allocs** |
+
+Verify with profiler:
+```bash
+go test -bench=BenchmarkDecode_tinywasm -memprofile=/tmp/fix_mem.prof -run=^$ ./tests/...
+go tool pprof -top /tmp/fix_mem.prof
+```
+
+`fmt.GetConv` / `fmt.Convert` / `fmt.init.func1` should **NOT** appear in the profile.
 
 ---
 
-## Stage 6: Update documentation
+## Stage 6: Update `benchmarks/README.md`
 
-### 6.1 Update `benchmarks/README.md`
-
-Replace the Performance Results table with new benchmark numbers.
+Replace the Performance Results table with the new numbers.
 Update "Last updated" date.
-
-### 6.2 Update `README.md`
-
-If it references `Values()` in API examples, update to show the new pattern.
 
 ---
 
 ## Stage 7: Publish
 
 ```bash
-gopush 'json: Fielder v2 migration — encode from pointers, zero-alloc key matching, parseString fast path'
+gopush 'json: zero-alloc decode — use fmt.LoadBytes for numbers, direct pointer writes'
 ```
 
 ---
 
+## Alloc Breakdown (target)
+
+For `{"name":"Alice","email":"alice@example.com","age":30,"score":9.5}`:
+
+| Step | Allocs | Detail |
+|------|--------|--------|
+| `parser{}` on stack | 0 | escape analysis |
+| `f.Schema()` | 0 | package-level var |
+| `f.Pointers()` | **1** | `[]any` slice (inevitable) |
+| key matching × 4 | 0 | `matchFieldIndex` byte comparison |
+| "Alice" string | **1** | `string(data[start:end])` copy (inevitable) |
+| "alice@example.com" | **1** | `string(data[start:end])` copy (inevitable) |
+| age=30 | 0 | `fmt.GetConv + LoadBytes + Int64 + PutConv` (pool) |
+| score=9.5 | 0 | `fmt.GetConv + LoadBytes + Float64 + PutConv` (pool) |
+| **Total** | **3** | **vs 20 before, vs 8 stdlib** |
+
 ## Summary
 
-| Stage | File(s) | Allocs eliminated |
-|-------|---------|-------------------|
-| 1 | `encode.go` | ~10 (Values boxing + Builder + Convert) |
-| 2 | `parser.go` | ~12 (Builder per string in decode) |
-| 3 | `parser.go` | ~8 (key string allocations) |
-| 4 | `decode.go` | 1 (string→[]byte copy) |
-| 5 | `tests/` | — (test migration) |
-| 6 | docs | — |
-| 7 | — | publish |
+| Stage | File(s) | Change |
+|-------|---------|--------|
+| 1 | `parser.go` | Add `parseNumberInto` — uses `fmt.LoadBytes` (0 allocs) |
+| 2 | `parser.go` | Add `parseIntoPtr` — direct pointer writes |
+| 3 | `parser.go` | Wire into `parseIntoFielder` |
+| 4 | `decode.go` | Stack-allocate parser |
+| 5 | tests | Verify 3 allocs target |
+| 6 | docs | Update benchmarks README |
+| 7 | — | `gopush` |
 
-**Projected totals:** Encode 1-2 allocs, Decode 3-5 allocs (from 14 and 32).
+**Código nuevo en json:** ~80 líneas (`parseNumberInto` + `parseIntoPtr`).
+**Código duplicado de fmt:** 0. Toda la lógica de parsing numérico se reutiliza via `LoadBytes + Int64/Float64`.
