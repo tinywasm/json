@@ -48,9 +48,9 @@ Last updated: 2026-03-12
 
 | Benchmark | tinywasm/json | encoding/json | Δ allocs |
 |-----------|--------------|---------------|----------|
-| Encode    | 1596 ns/op 830 B/op 14 allocs | 548 ns/op 80 B/op 1 allocs | +13 |
-| Decode    | 2708 ns/op 1460 B/op 32 allocs | 2145 ns/op 376 B/op 8 allocs | +24 |
-| RoundTrip | 4595 ns/op 2329 B/op 47 allocs | 2586 ns/op 376 B/op 8 allocs | +39 |
+| Encode    | 641 ns/op 144 B/op 2 allocs | 573 ns/op 80 B/op 1 allocs | +1 |
+| Decode    | 1709 ns/op 848 B/op 20 allocs | 2184 ns/op 376 B/op 8 allocs | +12 |
+| RoundTrip | 2654 ns/op 1136 B/op 24 allocs | 2565 ns/op 376 B/op 8 allocs | +16 |
 
 > Run: `go test -bench=. -benchmem ./tests/...`
 

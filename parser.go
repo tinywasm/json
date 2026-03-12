@@ -64,16 +64,51 @@ func (p *parser) parseValue() (any, error) {
 	}
 }
 
+// parseString parses a JSON string. The opening '"' must already be consumed.
+// Fast path: if no escape sequences, returns string(data[start:end]) — 1 alloc.
+// Slow path: uses Conv builder for strings with escapes — 2 allocs.
 func (p *parser) parseString() (string, error) {
-	var b fmt.Builder
+	start := p.pos
 	for p.pos < len(p.data) {
-		c := p.next()
+		c := p.data[p.pos]
 		if c == '"' {
-			return b.String(), nil
+			s := string(p.data[start:p.pos])
+			p.pos++ // consume closing '"'
+			return s, nil
 		}
 		if c == '\\' {
-			c = p.next()
-			switch c {
+			// Escape found — fall back to slow path with builder
+			return p.parseStringEscape(start)
+		}
+		p.pos++
+	}
+	return "", fmt.Err("json", "decode", "unexpected EOF")
+}
+
+// parseStringEscape handles strings with escape sequences.
+// Called when parseString encounters '\' at some position.
+// start is the position of the first character after the opening '"'.
+func (p *parser) parseStringEscape(start int) (string, error) {
+	b := fmt.GetConv()
+	defer b.PutConv()
+	// Write the part before the escape that was already scanned
+	for i := start; i < p.pos; i++ {
+		b.WriteByte(p.data[i])
+	}
+	// Continue parsing with escape handling
+	for p.pos < len(p.data) {
+		c := p.data[p.pos]
+		p.pos++
+		if c == '"' {
+			return b.GetString(fmt.BuffOut), nil
+		}
+		if c == '\\' {
+			if p.pos >= len(p.data) {
+				return "", fmt.Err("json", "decode", "unexpected EOF")
+			}
+			esc := p.data[p.pos]
+			p.pos++
+			switch esc {
 			case '"':
 				b.WriteByte('"')
 			case '\\':
@@ -94,8 +129,9 @@ func (p *parser) parseString() (string, error) {
 				if p.pos+4 > len(p.data) {
 					return "", fmt.Err("json", "decode", "invalid unicode escape")
 				}
-				val, _ := fmt.Convert(string(p.data[p.pos : p.pos+4])).Int64(16)
+				s := string(p.data[p.pos : p.pos+4])
 				p.pos += 4
+				val, _ := fmt.Convert(s).Int64(16)
 				b.WriteByte(byte(val))
 			default:
 				return "", fmt.Err("json", "decode", "invalid escape sequence")
@@ -176,6 +212,54 @@ func (p *parser) parseArray() ([]any, error) {
 	return res, nil
 }
 
+// matchFieldIndex matches the current JSON key (bytes between pos and closing '"')
+// against schema field names WITHOUT allocating a string.
+// Returns field index or -1 if not found. Advances pos past the closing '"'.
+// Falls back to parseString if escape sequences are found.
+func (p *parser) matchFieldIndex(schema []fmt.Field) (int, error) {
+	start := p.pos
+	for p.pos < len(p.data) {
+		c := p.data[p.pos]
+		if c == '"' {
+			keyBytes := p.data[start:p.pos]
+			p.pos++ // consume closing '"'
+			for i, field := range schema {
+				k, _ := parseJSONTag(field)
+				if len(k) == len(keyBytes) && matchBytesStr(k, keyBytes) {
+					return i, nil
+				}
+			}
+			return -1, nil // unknown field
+		}
+		if c == '\\' {
+			// Rare: escaped key — fall back to allocating path
+			key, err := p.parseStringEscape(start)
+			if err != nil {
+				return -1, err
+			}
+			for i, field := range schema {
+				k, _ := parseJSONTag(field)
+				if k == key {
+					return i, nil
+				}
+			}
+			return -1, nil
+		}
+		p.pos++
+	}
+	return -1, fmt.Err("json", "decode", "unexpected EOF in key")
+}
+
+// matchBytesStr compares a string against a byte slice without allocation.
+func matchBytesStr(s string, b []byte) bool {
+	for i := 0; i < len(s); i++ {
+		if s[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
 // parseIntoFielder parses a JSON object directly into the Fielder.
 // Eliminates the need for map[string]any as an intermediary.
 func (p *parser) parseIntoFielder(f fmt.Fielder) error {
@@ -198,23 +282,15 @@ func (p *parser) parseIntoFielder(f fmt.Fielder) error {
 		if p.next() != '"' {
 			return fmt.Err("json", "decode", "expected quote")
 		}
-		key, err := p.parseString()
+
+		fieldIdx, err := p.matchFieldIndex(schema)
 		if err != nil {
 			return err
 		}
+
 		p.skipWhitespace()
 		if p.next() != ':' {
 			return fmt.Err("json", "decode", "expected :")
-		}
-
-		// Search for the field in the schema
-		fieldIdx := -1
-		for i, field := range schema {
-			k, _ := parseJSONTag(field)
-			if k == key {
-				fieldIdx = i
-				break
-			}
 		}
 
 		if fieldIdx < 0 {

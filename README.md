@@ -42,7 +42,6 @@ type User struct {
 func (u *User) Schema() []fmt.Field {
     return []fmt.Field{{Name: "Name", Type: fmt.FieldText, JSON: "name"}}
 }
-func (u *User) Values() []any   { return []any{u.Name} }
 func (u *User) Pointers() []any { return []any{&u.Name} }
 
 func main() {
@@ -84,8 +83,8 @@ and **zero-reflect**, eliminating reflection overhead and heavy dependencies.
 
 | Benchmark | tinywasm/json | encoding/json |
 |-----------|--------------|---------------|
-| Encode    | 1565 ns/op   | 542 ns/op     |
-| Decode    | 2706 ns/op   | 2091 ns/op    |
+| Encode    | 641 ns/op    | 573 ns/op     |
+| Decode    | 1709 ns/op   | 2184 ns/op    |
 
 See full results and analysis in [benchmarks/README.md](benchmarks/README.md).
 
