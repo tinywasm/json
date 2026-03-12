@@ -18,10 +18,6 @@ func (s *TestStruct) Schema() []fmt.Field {
 	}
 }
 
-func (s *TestStruct) Values() []any {
-	return []any{s.Name, s.Age}
-}
-
 func (s *TestStruct) Pointers() []any {
 	return []any{&s.Name, &s.Age}
 }

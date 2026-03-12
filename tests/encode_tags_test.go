@@ -11,14 +11,14 @@ func TestEncodeNested(t *testing.T) {
 		schema: []fmt.Field{
 			{Name: "City", Type: fmt.FieldText, JSON: "city"},
 		},
-		values: []any{"Paris"},
+		pointers: []any{ptrString("Paris")},
 	}
 	outer := &mockFielder{
 		schema: []fmt.Field{
 			{Name: "User", Type: fmt.FieldText, JSON: "user"},
 			{Name: "Address", Type: fmt.FieldStruct, JSON: "address"},
 		},
-		values: []any{"Alice", inner},
+		pointers: []any{ptrString("Alice"), inner},
 	}
 	var out string
 	if err := json.Encode(outer, &out); err != nil {
@@ -35,7 +35,7 @@ func TestEncodeJSONKeyOmitEmpty(t *testing.T) {
 		schema: []fmt.Field{
 			{Name: "FirstName", Type: fmt.FieldText, JSON: ",omitempty"},
 		},
-		values: []any{""},
+		pointers: []any{ptrString("")},
 	}
 	var out string
 	if err := json.Encode(m, &out); err != nil {
@@ -53,7 +53,7 @@ func TestEncodeOmitEmpty(t *testing.T) {
 			{Name: "Name", Type: fmt.FieldText, JSON: "name"},
 			{Name: "Age", Type: fmt.FieldInt, JSON: "age,omitempty"},
 		},
-		values: []any{"Alice", int64(0)},
+		pointers: []any{ptrString("Alice"), ptrInt64(0)},
 	}
 	var out string
 	if err := json.Encode(m, &out); err != nil {
@@ -71,7 +71,7 @@ func TestEncodeJSONExclude(t *testing.T) {
 			{Name: "Name", Type: fmt.FieldText, JSON: "name"},
 			{Name: "Secret", Type: fmt.FieldText, JSON: "-"},
 		},
-		values: []any{"Alice", "shhh"},
+		pointers: []any{ptrString("Alice"), ptrString("shhh")},
 	}
 	var out string
 	if err := json.Encode(m, &out); err != nil {
@@ -88,7 +88,7 @@ func TestEncodeJSONKey(t *testing.T) {
 		schema: []fmt.Field{
 			{Name: "FirstName", Type: fmt.FieldText, JSON: "first_name"},
 		},
-		values: []any{"Alice"},
+		pointers: []any{ptrString("Alice")},
 	}
 	var out string
 	if err := json.Encode(m, &out); err != nil {
@@ -105,7 +105,7 @@ func TestEncodeJSONKeyFallback(t *testing.T) {
 		schema: []fmt.Field{
 			{Name: "FirstName", Type: fmt.FieldText, JSON: ""},
 		},
-		values: []any{"Alice"},
+		pointers: []any{ptrString("Alice")},
 	}
 	var out string
 	if err := json.Encode(m, &out); err != nil {

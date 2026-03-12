@@ -3,6 +3,7 @@ package json
 import (
 	"github.com/tinywasm/fmt"
 	"io"
+	"unsafe"
 )
 
 // Decode parses JSON into a Fielder.
@@ -13,7 +14,8 @@ func Decode(input any, data fmt.Fielder) error {
 	case []byte:
 		raw = in
 	case string:
-		raw = []byte(in)
+		// Avoid copy: parser is read-only, never modifies data.
+		raw = unsafe.Slice(unsafe.StringData(in), len(in))
 	case io.Reader:
 		var buf []byte
 		tmp := make([]byte, 4096)

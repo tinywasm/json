@@ -14,15 +14,14 @@ type benchUser struct {
     Score float64
 }
 
-func (u *benchUser) Schema() []fmt.Field {
-    return []fmt.Field{
-        {Name: "Name", Type: fmt.FieldText, JSON: "name"},
-        {Name: "Email", Type: fmt.FieldText, JSON: "email"},
-        {Name: "Age", Type: fmt.FieldInt, JSON: "age"},
-        {Name: "Score", Type: fmt.FieldFloat, JSON: "score"},
-    }
+var benchSchema = []fmt.Field{
+	{Name: "Name", Type: fmt.FieldText, JSON: "name"},
+	{Name: "Email", Type: fmt.FieldText, JSON: "email"},
+	{Name: "Age", Type: fmt.FieldInt, JSON: "age"},
+	{Name: "Score", Type: fmt.FieldFloat, JSON: "score"},
 }
-func (u *benchUser) Values() []any   { return []any{u.Name, u.Email, u.Age, u.Score} }
+
+func (u *benchUser) Schema() []fmt.Field { return benchSchema }
 func (u *benchUser) Pointers() []any { return []any{&u.Name, &u.Email, &u.Age, &u.Score} }
 
 var benchInput = &benchUser{Name: "Alice", Email: "alice@example.com", Age: 30, Score: 9.5}

@@ -10,7 +10,7 @@ import (
 func TestEncodeToBytes(t *testing.T) {
 	m := &mockFielder{
 		schema: []fmt.Field{{Name: "A", Type: fmt.FieldInt, JSON: "a"}},
-		values: []any{int64(1)},
+		pointers: []any{ptrInt64(1)},
 	}
 	var out []byte
 	if err := json.Encode(m, &out); err != nil {
@@ -25,7 +25,7 @@ func TestEncodeToBytes(t *testing.T) {
 func TestEncodeToWriter(t *testing.T) {
 	m := &mockFielder{
 		schema: []fmt.Field{{Name: "A", Type: fmt.FieldInt, JSON: "a"}},
-		values: []any{int64(1)},
+		pointers: []any{ptrInt64(1)},
 	}
 	var buf bytes.Buffer
 	if err := json.Encode(m, &buf); err != nil {
@@ -41,7 +41,7 @@ func TestEncodeToWriter(t *testing.T) {
 func TestEncodeToString(t *testing.T) {
 	m := &mockFielder{
 		schema: []fmt.Field{{Name: "A", Type: fmt.FieldInt, JSON: "a"}},
-		values: []any{int64(1)},
+		pointers: []any{ptrInt64(1)},
 	}
 	var out string
 	if err := json.Encode(m, &out); err != nil {
@@ -57,7 +57,7 @@ func TestEncodeToString(t *testing.T) {
 func TestEncodeInvalidOutput(t *testing.T) {
 	m := &mockFielder{
 		schema: []fmt.Field{{Name: "A", Type: fmt.FieldInt, JSON: "a"}},
-		values: []any{int64(1)},
+		pointers: []any{ptrInt64(1)},
 	}
 	if err := json.Encode(m, 123); err == nil {
 		t.Fatal("expected error for invalid output type")
@@ -73,7 +73,7 @@ func (e *errWriter) Write(p []byte) (n int, err error) {
 func TestEncodeWriterError(t *testing.T) {
 	m := &mockFielder{
 		schema: []fmt.Field{{Name: "V", Type: fmt.FieldText, JSON: "v"}},
-		values: []any{"hello"},
+		pointers: []any{ptrString("hello")},
 	}
 	if err := json.Encode(m, &errWriter{}); err == nil {
 		t.Fatal("expected error from writer")
