@@ -38,7 +38,7 @@ func (p *parser) next() byte {
 
 func (p *parser) parseValue() (any, error) {
 	p.skipWhitespace()
-	c := p.peek()
+	c := p.next()
 	switch c {
 	case '"':
 		return p.parseString()
@@ -47,14 +47,17 @@ func (p *parser) parseValue() (any, error) {
 	case '[':
 		return p.parseArray()
 	case 't', 'f':
+		p.pos-- // back to 't' or 'f'
 		return p.parseBool()
 	case 'n':
+		p.pos--
 		if err := p.parseNull(); err != nil {
 			return nil, err
 		}
 		return nil, nil
 	default:
 		if (c >= '0' && c <= '9') || c == '-' {
+			p.pos--
 			return p.parseNumber()
 		}
 		return nil, fmt.Err("json", "decode", "unexpected character")
@@ -62,10 +65,6 @@ func (p *parser) parseValue() (any, error) {
 }
 
 func (p *parser) parseString() (string, error) {
-	if p.next() != '"' {
-		return "", fmt.Err("json", "decode", "expected quote")
-	}
-
 	var b fmt.Builder
 	for p.pos < len(p.data) {
 		c := p.next()
@@ -153,9 +152,6 @@ func (p *parser) parseNull() error {
 }
 
 func (p *parser) parseArray() ([]any, error) {
-	if p.next() != '[' {
-		return nil, fmt.Err("json", "decode", "expected [")
-	}
 	var res []any
 	p.skipWhitespace()
 	if p.peek() == ']' {
@@ -199,6 +195,9 @@ func (p *parser) parseIntoFielder(f fmt.Fielder) error {
 
 	for {
 		p.skipWhitespace()
+		if p.next() != '"' {
+			return fmt.Err("json", "decode", "expected quote")
+		}
 		key, err := p.parseString()
 		if err != nil {
 			return err
@@ -259,9 +258,6 @@ func (p *parser) parseIntoFielder(f fmt.Fielder) error {
 }
 
 func (p *parser) parseObject() (map[string]any, error) {
-	if p.next() != '{' {
-		return nil, fmt.Err("json", "decode", "expected {")
-	}
 	res := make(map[string]any)
 	p.skipWhitespace()
 	if p.peek() == '}' {
@@ -270,6 +266,9 @@ func (p *parser) parseObject() (map[string]any, error) {
 	}
 	for {
 		p.skipWhitespace()
+		if p.next() != '"' {
+			return nil, fmt.Err("json", "decode", "expected quote")
+		}
 		key, err := p.parseString()
 		if err != nil {
 			return nil, err

@@ -5,13 +5,30 @@ package main
 import (
 	"syscall/js"
 
+	"github.com/tinywasm/fmt"
 	"github.com/tinywasm/json"
 )
 
 type User struct {
-	Name  string `json:"name"`
-	Email string `json:"email"`
-	Age   int    `json:"age"`
+	Name  string
+	Email string
+	Age   int64
+}
+
+func (u *User) Schema() []fmt.Field {
+	return []fmt.Field{
+		{Name: "Name", Type: fmt.FieldText, JSON: "name"},
+		{Name: "Email", Type: fmt.FieldText, JSON: "email"},
+		{Name: "Age", Type: fmt.FieldInt, JSON: "age"},
+	}
+}
+
+func (u *User) Values() []any {
+	return []any{u.Name, u.Email, u.Age}
+}
+
+func (u *User) Pointers() []any {
+	return []any{&u.Name, &u.Email, &u.Age}
 }
 
 func main() {
@@ -26,7 +43,7 @@ func main() {
 	body.Call("appendChild", h1)
 
 	// 1. Encode Example
-	user := User{
+	user := &User{
 		Name:  "John Doe",
 		Email: "john@example.com",
 		Age:   30,
@@ -45,8 +62,8 @@ func main() {
 	body.Call("appendChild", p1)
 
 	// 2. Decode Example
-	var decodedUser User
-	err = json.Decode(jsonData, &decodedUser)
+	decodedUser := &User{}
+	err = json.Decode(jsonData, decodedUser)
 	if err != nil {
 		console.Call("error", "Decode error:", err.Error())
 		return

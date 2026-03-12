@@ -31,6 +31,9 @@ func Encode(data fmt.Fielder, output any) error {
 func encodeFielder(b *fmt.Builder, f fmt.Fielder) error {
 	schema := f.Schema()
 	values := f.Values()
+	if values == nil && schema != nil {
+		return fmt.Err("json", "encode", "failed to get values")
+	}
 	b.WriteByte('{')
 
 	first := true

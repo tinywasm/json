@@ -23,7 +23,7 @@ func TestDecodeFloatFromInt(t *testing.T) {
 	}
 }
 
-// TestDecodeInt        — writeValue con *int
+// TestDecodeInt        — writeValue with *int
 func TestDecodeInt(t *testing.T) {
 	var v int
 	m := &mockFielder{
@@ -38,7 +38,7 @@ func TestDecodeInt(t *testing.T) {
 	}
 }
 
-// TestDecodeInt32      — writeValue con *int32
+// TestDecodeInt32      — writeValue with *int32
 func TestDecodeInt32(t *testing.T) {
 	var v int32
 	m := &mockFielder{
@@ -53,7 +53,7 @@ func TestDecodeInt32(t *testing.T) {
 	}
 }
 
-// TestDecodeFloat32    — writeValue con *float32
+// TestDecodeFloat32    — writeValue with *float32
 func TestDecodeFloat32(t *testing.T) {
 	var v float32
 	m := &mockFielder{
@@ -68,7 +68,7 @@ func TestDecodeFloat32(t *testing.T) {
 	}
 }
 
-// TestDecodeInt32FromFloat  — parser retorna float64 → *int32
+// TestDecodeInt32FromFloat  — parser returns float64 → *int32
 func TestDecodeInt32FromFloat(t *testing.T) {
 	var v int32
 	m := &mockFielder{
@@ -83,7 +83,7 @@ func TestDecodeInt32FromFloat(t *testing.T) {
 	}
 }
 
-// TestDecodeIntFromFloat    — parser retorna float64 → *int
+// TestDecodeIntFromFloat    — parser returns float64 → *int
 func TestDecodeIntFromFloat(t *testing.T) {
 	var v int
 	m := &mockFielder{
@@ -98,7 +98,7 @@ func TestDecodeIntFromFloat(t *testing.T) {
 	}
 }
 
-// TestDecodeFloat32FromInt  — parser retorna int64  → *float32
+// TestDecodeFloat32FromInt  — parser returns int64  → *float32
 func TestDecodeFloat32FromInt(t *testing.T) {
 	var v float32
 	m := &mockFielder{
@@ -110,5 +110,35 @@ func TestDecodeFloat32FromInt(t *testing.T) {
 	}
 	if v != 42.0 {
 		t.Errorf("expected 42.0, got %f", v)
+	}
+}
+
+// TestDecodeInt64Ptr — writeValue with *int64
+func TestDecodeInt64Ptr(t *testing.T) {
+	var v int64
+	m := &mockFielder{
+		schema:   []fmt.Field{{Name: "V", Type: fmt.FieldInt, JSON: "v"}},
+		pointers: []any{&v},
+	}
+	if err := json.Decode(`{"v":42}`, m); err != nil {
+		t.Fatal(err)
+	}
+	if v != 42 {
+		t.Errorf("expected 42, got %d", v)
+	}
+}
+
+// TestDecodeInt64FromFloat — parser returns float64 → *int64
+func TestDecodeInt64FromFloat(t *testing.T) {
+	var v int64
+	m := &mockFielder{
+		schema:   []fmt.Field{{Name: "V", Type: fmt.FieldInt, JSON: "v"}},
+		pointers: []any{&v},
+	}
+	if err := json.Decode(`{"v":42.0}`, m); err != nil {
+		t.Fatal(err)
+	}
+	if v != 42 {
+		t.Errorf("expected 42, got %d", v)
 	}
 }
