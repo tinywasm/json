@@ -25,6 +25,40 @@ func TestEncodeSimple(t *testing.T) {
 	}
 }
 
+func TestEncodeFielderError(t *testing.T) {
+	inner := &mockFielder{
+		schema: []fmt.Field{{Name: "E", Type: fmt.FieldText, JSON: "e"}},
+		values: []any{nil},
+		err:    fmt.Err("test", "encode", "error"),
+	}
+	outer := &mockFielder{
+		schema: []fmt.Field{{Name: "I", Type: fmt.FieldStruct, JSON: "i"}},
+		values: []any{inner},
+	}
+	var out string
+	if err := json.Encode(outer, &out); err == nil {
+		t.Fatal("expected error from inner fielder")
+	}
+}
+
+func TestEncodeFieldBytesNonBytes(t *testing.T) {
+	// FieldBlob with value that is not []byte -> encodeValue omits it or treats it via default.
+	// Actually encodeValue handles it via default (fmt.Convert).
+	// To trigger default in encodeValue with something that is NOT handled by other cases:
+	m := &mockFielder{
+		schema: []fmt.Field{{Name: "V", Type: fmt.FieldBlob, JSON: "v"}},
+		values: []any{42}, // Not []byte, not string, not bool, not nil
+	}
+	var out string
+	if err := json.Encode(m, &out); err != nil {
+		t.Fatal(err)
+	}
+	expected := `{"v":42}`
+	if out != expected {
+		t.Errorf("expected %s, got %s", expected, out)
+	}
+}
+
 func TestEncodeStringEscaping(t *testing.T) {
 	m := &mockFielder{
 		schema: []fmt.Field{

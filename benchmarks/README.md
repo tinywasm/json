@@ -42,15 +42,15 @@ Both files implement the same functionality to ensure fair comparison.
 
 ## Performance Results
 
-Last updated: 2025-05-15
+Last updated: 2026-03-12
 
 ### Go Benchmark (`go test -bench`)
 
 | Benchmark | tinywasm/json | encoding/json | Δ allocs |
 |-----------|--------------|---------------|----------|
-| Encode    | 1565 ns/op 830 B/op 14 allocs | 542 ns/op 80 B/op 1 allocs | +13 |
-| Decode    | 2706 ns/op 1461 B/op 32 allocs | 2091 ns/op 376 B/op 8 allocs | +24 |
-| RoundTrip | 6124 ns/op 2329 B/op 47 allocs | 3727 ns/op 376 B/op 8 allocs | +39 |
+| Encode    | 1596 ns/op 830 B/op 14 allocs | 548 ns/op 80 B/op 1 allocs | +13 |
+| Decode    | 2708 ns/op 1460 B/op 32 allocs | 2145 ns/op 376 B/op 8 allocs | +24 |
+| RoundTrip | 4595 ns/op 2329 B/op 47 allocs | 2586 ns/op 376 B/op 8 allocs | +39 |
 
 > Run: `go test -bench=. -benchmem ./tests/...`
 

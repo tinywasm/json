@@ -30,6 +30,23 @@ func TestEncodeNested(t *testing.T) {
 	}
 }
 
+func TestEncodeJSONKeyOmitEmpty(t *testing.T) {
+	m := &mockFielder{
+		schema: []fmt.Field{
+			{Name: "FirstName", Type: fmt.FieldText, JSON: ",omitempty"},
+		},
+		values: []any{""},
+	}
+	var out string
+	if err := json.Encode(m, &out); err != nil {
+		t.Fatal(err)
+	}
+	expected := `{}`
+	if out != expected {
+		t.Errorf("expected %s, got %s", expected, out)
+	}
+}
+
 func TestEncodeOmitEmpty(t *testing.T) {
 	m := &mockFielder{
 		schema: []fmt.Field{

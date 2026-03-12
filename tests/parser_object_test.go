@@ -18,3 +18,10 @@ func TestParseObjectMissingColon(t *testing.T) {
 		t.Fatal("expected error for missing colon in object")
 	}
 }
+
+func TestParseObjectEmpty(t *testing.T) {
+	m := &mockFielder{}
+	if err := json.Decode(`{"a":{}}`, m); err != nil {
+		t.Fatal(err)
+	}
+}

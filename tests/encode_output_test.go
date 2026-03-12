@@ -63,3 +63,19 @@ func TestEncodeInvalidOutput(t *testing.T) {
 		t.Fatal("expected error for invalid output type")
 	}
 }
+
+type errWriter struct{}
+
+func (e *errWriter) Write(p []byte) (n int, err error) {
+	return 0, fmt.Err("test", "write", "error")
+}
+
+func TestEncodeWriterError(t *testing.T) {
+	m := &mockFielder{
+		schema: []fmt.Field{{Name: "V", Type: fmt.FieldText, JSON: "v"}},
+		values: []any{"hello"},
+	}
+	if err := json.Encode(m, &errWriter{}); err == nil {
+		t.Fatal("expected error from writer")
+	}
+}
