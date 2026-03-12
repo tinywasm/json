@@ -164,6 +164,75 @@ func (p *parser) parseNumber() (any, error) {
 	return fmt.Convert(s).Int64()
 }
 
+// parseNumberInto parses a JSON number directly into a typed pointer.
+// Uses fmt.GetConv + LoadBytes + Int64/Float64 + PutConv — 0 allocations
+// (reuses fmt's existing parseIntBase/parseFloatBase via pool).
+func (p *parser) parseNumberInto(ptr any, ft fmt.FieldType) error {
+	p.skipWhitespace()
+	start := p.pos
+	isFloat := false
+	for p.pos < len(p.data) {
+		c := p.data[p.pos]
+		if (c >= '0' && c <= '9') || c == '-' || c == '+' {
+			p.pos++
+		} else if c == '.' || c == 'e' || c == 'E' {
+			isFloat = true
+			p.pos++
+		} else {
+			break
+		}
+	}
+	if p.pos == start {
+		return fmt.Err("json", "decode", "expected number")
+	}
+
+	numBytes := p.data[start:p.pos]
+
+	c := fmt.GetConv()
+	c.LoadBytes(numBytes)
+
+	if ft == fmt.FieldFloat || isFloat {
+		v, err := c.Float64()
+		c.PutConv()
+		if err != nil {
+			return err
+		}
+		if ft == fmt.FieldFloat {
+			switch fp := ptr.(type) {
+			case *float64:
+				*fp = v
+			case *float32:
+				*fp = float32(v)
+			}
+		} else {
+			// FieldInt but JSON has decimal/exponent — truncate
+			switch ip := ptr.(type) {
+			case *int64:
+				*ip = int64(v)
+			case *int:
+				*ip = int(v)
+			case *int32:
+				*ip = int32(v)
+			}
+		}
+	} else {
+		v, err := c.Int64()
+		c.PutConv()
+		if err != nil {
+			return err
+		}
+		switch ip := ptr.(type) {
+		case *int64:
+			*ip = v
+		case *int:
+			*ip = int(v)
+		case *int32:
+			*ip = int32(v)
+		}
+	}
+	return nil
+}
+
 func (p *parser) parseBool() (bool, error) {
 	if p.peek() == 't' {
 		if p.pos+4 <= len(p.data) && string(p.data[p.pos:p.pos+4]) == "true" {
@@ -185,6 +254,62 @@ func (p *parser) parseNull() error {
 		return nil
 	}
 	return fmt.Err("json", "decode", "expected null")
+}
+
+// parseIntoPtr parses a JSON value directly into a typed pointer.
+// Bypasses parseValue()/writeValue() to avoid boxing values into any.
+func (p *parser) parseIntoPtr(ptr any, ft fmt.FieldType) error {
+	p.skipWhitespace()
+
+	// Handle JSON null for any type
+	if p.peek() == 'n' {
+		return p.parseNull()
+	}
+
+	switch ft {
+	case fmt.FieldText:
+		if p.next() != '"' {
+			return fmt.Err("json", "decode", "expected string")
+		}
+		s, err := p.parseString()
+		if err != nil {
+			return err
+		}
+		if sp, ok := ptr.(*string); ok {
+			*sp = s
+		}
+		return nil
+
+	case fmt.FieldInt, fmt.FieldFloat:
+		return p.parseNumberInto(ptr, ft)
+
+	case fmt.FieldBool:
+		b, err := p.parseBool()
+		if err != nil {
+			return err
+		}
+		if bp, ok := ptr.(*bool); ok {
+			*bp = b
+		}
+		return nil
+
+	case fmt.FieldBlob:
+		if p.next() != '"' {
+			return fmt.Err("json", "decode", "expected string for blob")
+		}
+		s, err := p.parseString()
+		if err != nil {
+			return err
+		}
+		if bp, ok := ptr.(*[]byte); ok {
+			*bp = []byte(s)
+		}
+		return nil
+	}
+
+	// Fallback for unknown field types
+	_, err := p.parseValue()
+	return err
 }
 
 func (p *parser) parseArray() ([]any, error) {
@@ -313,11 +438,9 @@ func (p *parser) parseIntoFielder(f fmt.Fielder) error {
 					}
 				}
 			} else {
-				val, err := p.parseValue()
-				if err != nil {
+				if err := p.parseIntoPtr(ptr, field.Type); err != nil {
 					return err
 				}
-				writeValue(ptr, field.Type, val)
 			}
 		}
 
