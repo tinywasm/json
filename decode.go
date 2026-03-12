@@ -33,7 +33,7 @@ func Decode(input any, data fmt.Fielder) error {
 		return fmt.Err("json", "decode", "input must be []byte, string, or io.Reader")
 	}
 
-	p := &parser{data: raw}
+	p := parser{data: raw}
 	return p.parseIntoFielder(data)
 }
 
