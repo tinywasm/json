@@ -1,96 +1,37 @@
-# PLAN: Reorganización de Tests + 100% Coverage + Benchmarks vs stdlib
+# PLAN: tinywasm/json — Pendientes post Stage 5 (v0.2.0)
 
 ## Development Rules
 
-- **Standard Library Only:** No external assertion libraries. Use `testing` for tests.
-- **Testing Runner:** Install and use `gotest`:
-  ```bash
-  go install github.com/tinywasm/devflow/cmd/gotest@latest
-  ```
+- **Standard Library Only:** No external assertion libraries. Use `testing`.
+- **Testing Runner:** Use `gotest` (install: `go install github.com/tinywasm/devflow/cmd/gotest@latest`).
 - **Max 500 lines per file.** If exceeded, subdivide by domain.
-- **Flat hierarchy.** No subdirectories for library code. Exception: `tests/` for test files when >5.
+- **Flat hierarchy.** No subdirectories for library code.
 - **TinyGo Compatible:** No `fmt`, `strings`, `strconv`, `errors` from stdlib. Use `tinywasm/fmt`.
-- **No maps** in WASM code (binary bloat). Applies to internal code too.
+- **No maps** in WASM code (binary bloat).
 - **Documentation First:** Update docs before coding.
 - **Publishing:** Use `gopush 'message'` after tests pass and docs are updated.
 
 ## Context
 
-Stages 1–5 completados. El codec es single-pass, zero-reflect, sin `map` intermedio.
-Los archivos activos son: `encode.go`, `decode.go`, `parser.go`.
+Stages 6–9 se ejecutaron parcialmente. Los archivos en `tests/` existen pero:
+- `encode_test.go` y `decode_test.go` en raíz aún no fueron eliminados (Stage 6.2).
+- Cobertura actual: **93.5%** (objetivo: 100%). Brechas en `parseObject`, `parseArray`, `parseString`, `encodeValue`, `Encode`, etc.
+- `benchmarks/clients/tinyjson/main.go` aún usa la API antigua con struct tags (Stage 9.4).
+- **Bug bloqueante:** `tinywasm/fmt.Convert(s).Float64()` falla con notación científica (e.g. `"1e2"`). Resuelto en `tinywasm/fmt` antes de continuar.
 
-Tests actuales en raíz: `encode_test.go`, `decode_test.go` → deben moverse a `tests/`.
-Ya existe `tests/json_test.go` (integración) — se expande con el resto.
-
-Cobertura actual: **parcial**. Faltan ramas en `encodeValue`, `writeValue`,
-`parseString`, `parser`, y paths de error en `Encode`/`Decode`.
-
-Los benchmarks existentes en `benchmarks/clients/` son demos WASM, **no** son
-`BenchmarkXxx` ejecutables con `go test -bench`. No hay medición real vs stdlib.
+**Prerequisito:** Esperar el fix de `tinywasm/fmt` (scientific notation en `parseFloatBase`). Actualizar `go.mod` con la nueva versión de `tinywasm/fmt` antes de ejecutar tests.
 
 ---
 
-## Stage 6: Reorganizar tests en `tests/`
+## Stage A: Eliminar test files obsoletos de raíz
 
-Mover **todos** los test files a `tests/`, con nombres que indican exactamente qué prueban.
-Cada archivo debe ser pequeño (< 150 líneas), enfocado en un dominio.
+### A.1 Eliminar archivos
 
-### 6.1 Estructura final de `tests/`
-
-```
-tests/
-├── helpers_test.go         — mockFielder compartido entre todos los archivos
-├── encode_basic_test.go    — string, int, bool, nil, bytes → JSON
-├── encode_tags_test.go     — JSON tag: key, omitempty, "-", fallback
-├── encode_output_test.go   — output *[]byte, *string, io.Writer, error
-├── encode_types_test.go    — todos los tipos numéricos de Values()
-├── decode_basic_test.go    — JSON → string, int, bool, float, bytes
-├── decode_types_test.go    — *int, *int32, *float32, coerciones float↔int
-├── decode_input_test.go    — input []byte, string, io.Reader, error
-├── decode_tags_test.go     — JSON tag: key, omitempty, "-", missing, extra
-├── decode_nested_test.go   — FieldStruct recursivo, ptr no Fielder, discard
-├── parser_string_test.go   — todos los escapes: \b \f \/ \uXXXX, EOF, error
-├── parser_number_test.go   — int64, float64, negativo, notación científica
-├── parser_bool_null_test.go — parseBool true/false/error, parseNull/error
-├── parser_array_test.go    — empty, values, bad separator, error
-├── parser_object_test.go   — empty, keys, bad colon/separator, error
-├── parser_limits_test.go   — peek/next vacío, skipWhitespace, char desconocido
-├── bench_encode_test.go    — BenchmarkEncode tinywasm vs stdlib
-├── bench_decode_test.go    — BenchmarkDecode tinywasm vs stdlib
-├── bench_roundtrip_test.go — BenchmarkRoundTrip tinywasm vs stdlib
-└── json_test.go            — integración end-to-end (ya existe, mantener)
+```bash
+rm encode_test.go decode_test.go
 ```
 
-### 6.2 Eliminar de la raíz
-
-```
-encode_test.go   → DELETE (contenido migrado a tests/encode_*_test.go)
-decode_test.go   → DELETE (contenido migrado a tests/decode_*_test.go)
-```
-
-### 6.3 `tests/helpers_test.go`
-
-```go
-package tests
-
-import "github.com/tinywasm/fmt"
-
-type mockFielder struct {
-    schema   []fmt.Field
-    values   []any
-    pointers []any
-}
-
-func (m *mockFielder) Schema() []fmt.Field { return m.schema }
-func (m *mockFielder) Values() []any       { return m.values }
-func (m *mockFielder) Pointers() []any     { return m.pointers }
-```
-
-### 6.4 Migrar tests existentes
-
-Mover cada función de test al archivo correspondiente según la tabla del 6.1.
-No modificar la lógica, solo cambiar el `package` a `tests` y agregar el import
-`"github.com/tinywasm/json"`.
+### A.2 Verificar
 
 ```bash
 gotest
@@ -98,425 +39,264 @@ gotest
 
 ---
 
-## Stage 7: Cobertura 100% — Encoder (`tests/encode_*`)
+## Stage B: Alcanzar 100% de cobertura
 
-### 7.1 `tests/encode_output_test.go` — completar con tests faltantes
+Funciones con brechas (medidas con `go test -coverprofile -coverpkg=. ./tests/...`):
+
+| Función | Cobertura actual | Brecha |
+|---------|-----------------|--------|
+| `parseObject` | 69.2% | empty object `{}`, error paths |
+| `parseArray` | 89.5% | `expected [` error (wrong first char) |
+| `parseString` | 96.2% | `invalid unicode escape` (short `\u00X`) |
+| `encodeValue` | 91.7% | `FieldBytes` sin `[]byte` type, `FieldStruct` → not Fielder |
+| `Encode` | 90.9% | `io.Writer` error path |
+| `encodeFielder` | 96.2% | `omitempty` con valor cero en struct |
+| `parseJSONTag` | 93.8% | tag con solo `-` (campo ignorado) |
+| `writeValue` | 96.3% | `*int64` pointer type |
+| `parseIntoFielder` | 95.6% | objeto vacío `{}` como input al Decoder |
+
+### B.1 `tests/parser_object_test.go` — agregar tests faltantes
 
 ```go
-// TestEncodeToString — output *string (ausente en tests originales)
-func TestEncodeToString(t *testing.T) { ... }
+// TestParseObjectEmpty — {"a":{}} → objeto vacío como campo discartado
+func TestParseObjectEmpty(t *testing.T) {
+    m := &mockFielder{}
+    if err := json.Decode(`{"a":{}}`, m); err != nil {
+        t.Fatal(err)
+    }
+}
 
-// TestEncodeInvalidOutput — output desconocido → error
-func TestEncodeInvalidOutput(t *testing.T) { ... }
+// TestParseObjectNotBrace — parseObject recibe input que no empieza con '{'
+// Se activa cuando parseValue encuentra '{' pero el objeto anidado no es válido.
+// Esto se logra decodificando un campo FieldStruct cuyo valor no es '{':
+func TestParseObjectMissingOpenBrace(t *testing.T) {
+    // Usar un Fielder con un campo FieldStruct y pasarle un valor que no sea '{'
+    // parseIntoFielder ya cubre '{' faltante; aquí necesitamos parseObject directamente.
+    // parseObject se llama desde parseValue cuando peek() == '{'.
+    // Para forzar el error de parseObject ("expected {"), necesitamos que
+    // parseValue llame a parseObject pero el primer char consumido no sea '{'.
+    // Esto no es posible directamente via Decode. Este error path es dead code
+    // (parseValue solo llama parseObject cuando peek() == '{', y parseObject
+    // consume ese '{' como primer next()). Documentar como dead code en el comentario del test.
+    t.Skip("parseObject 'expected {' is unreachable: parseValue only calls it when peek()=='{', ensuring next()=='{' always")
+}
 ```
 
-### 7.2 `tests/encode_types_test.go` — todos los tipos numéricos
+**Nota:** Revisando el código, `parseObject` es llamado desde `parseValue` solo cuando `peek() == '{'`. Inmediatamente `parseObject` llama `p.next()` que consume ese `'{'`. Por tanto, el branch `return nil, fmt.Err("json", "decode", "expected {")` en `parseObject` es **dead code** — nunca puede ejecutarse vía la API pública. La misma situación aplica a `parseArray` con `expected [`.
+
+**Acción:** Documentar estos branches como dead code y eliminarlos de `parseObject` y `parseArray` para que la cobertura suba a 100%, o dejar un comentario explicando por qué son inalcanzables.
+
+### B.2 Eliminar dead code en `parser.go`
+
+En `parseArray` (línea ~156) y `parseObject` (línea ~262), eliminar los primeros `if p.next() != '['/'{' { return error }` ya que son dead code: `parseValue` solo los llama cuando `peek()` retorna el carácter correcto.
+
+**Alternativa (preferida):** Convertir `parseArray` y `parseObject` en funciones que asumen que el primer `[`/`{` ya fue consumido por el caller (`parseValue`). Así se elimina el dead code y la lógica es más explícita.
 
 ```go
-// TestEncodeNumericTypes — int, int32, int64, uint, uint64, float32, float64
-func TestEncodeNumericTypes(t *testing.T) {
-    cases := []struct {
-        name     string
-        val      any
-        expected string
-    }{
-        {"int", int(5), `{"v":5}`},
-        {"int32", int32(5), `{"v":5}`},
-        {"int64", int64(5), `{"v":5}`},
-        {"float32", float32(1.5), `{"v":1.5}`},
-        {"float64", float64(1.5), `{"v":1.5}`},
-        {"uint", uint(5), `{"v":5}`},
-        {"uint64", uint64(5), `{"v":5}`},
+// parseArray asume que '[' ya fue consumido por parseValue
+func (p *parser) parseArray() ([]any, error) {
+    var res []any
+    p.skipWhitespace()
+    if p.peek() == ']' {
+        p.next()
+        return res, nil
     }
-    for _, c := range cases {
-        t.Run(c.name, func(t *testing.T) {
-            m := &mockFielder{
-                schema: []fmt.Field{{Name: "V", Type: fmt.FieldInt, JSON: "v"}},
-                values: []any{c.val},
-            }
-            var out string
-            if err := json.Encode(m, &out); err != nil {
-                t.Fatal(err)
-            }
-            if out != c.expected {
-                t.Errorf("expected %s, got %s", c.expected, out)
-            }
-        })
+    for { ... }
+    return res, nil
+}
+```
+
+Y en `parseValue`:
+```go
+case '[':
+    p.next() // consume '['
+    return p.parseArray()
+case '{':
+    p.next() // consume '{'
+    return p.parseObject()
+```
+
+Actualizar `parseObject` igual.
+
+### B.3 Tests restantes para brechas reales
+
+Agregar en los archivos correspondientes de `tests/`:
+
+**`tests/parser_string_test.go`** — ya debe tener `TestParseStringUnicodeShort`. Si falta:
+```go
+func TestParseStringUnicodeShort(t *testing.T) {
+    m := &mockFielder{}
+    if err := json.Decode(`{"a":"\u004"}`, m); err == nil {
+        t.Fatal("expected error for short unicode escape")
     }
 }
 ```
 
-### 7.3 `tests/encode_basic_test.go` — ramas faltantes
-
+**`tests/decode_types_test.go`** — agregar `*int64`:
 ```go
-// TestEncodeStructNotFielder — FieldStruct cuyo value no implementa Fielder → omitido
-func TestEncodeStructNotFielder(t *testing.T) { ... }
-
-// TestEncodeControlChars — chars < 0x20 → \u00XX
-func TestEncodeControlChars(t *testing.T) { ... }
+func TestDecodeInt64Ptr(t *testing.T) {
+    var v int64
+    m := &mockFielder{
+        schema:   []fmt.Field{{Name: "V", Type: fmt.FieldInt, JSON: "v"}},
+        pointers: []any{&v},
+    }
+    if err := json.Decode(`{"v":42}`, m); err != nil {
+        t.Fatal(err)
+    }
+    if v != 42 {
+        t.Errorf("expected 42, got %d", v)
+    }
+}
 ```
+
+**`tests/encode_output_test.go`** — cubrir error de `io.Writer`:
+```go
+type errWriter struct{}
+func (e *errWriter) Write(p []byte) (n int, err error) {
+    return 0, fmt.Err("test", "write", "error")  // usar errors.New del stdlib aquí
+}
+
+func TestEncodeWriterError(t *testing.T) {
+    m := &mockFielder{
+        schema: []fmt.Field{{Name: "V", Type: fmt.FieldText, JSON: "v"}},
+        values: []any{"hello"},
+    }
+    if err := json.Encode(m, &errWriter{}); err == nil {
+        t.Fatal("expected error from writer")
+    }
+}
+```
+
+**`tests/encode_basic_test.go`** — cubrir `FieldBytes` con valor no-`[]byte`:
+```go
+func TestEncodeFieldBytesNonBytes(t *testing.T) {
+    // FieldBytes con value que no es []byte → encodeValue lo omite
+    m := &mockFielder{
+        schema: []fmt.Field{{Name: "V", Type: fmt.FieldBytes, JSON: "v"}},
+        values: []any{"notbytes"},
+    }
+    var out string
+    if err := json.Encode(m, &out); err != nil {
+        t.Fatal(err)
+    }
+    // El campo se omite o produce JSON vacío
+}
+```
+
+### B.4 Verificar cobertura 100%
 
 ```bash
 gotest
+go test -coverprofile=/tmp/cover.out -coverpkg=. ./tests/... && go tool cover -func=/tmp/cover.out
 ```
 
 ---
 
-## Stage 8: Cobertura 100% — Decoder y Parser (`tests/decode_*`, `tests/parser_*`)
+## Stage C: Actualizar cliente WASM (Stage 9.4)
 
-### 8.1 `tests/decode_input_test.go`
+Archivo: `benchmarks/clients/tinyjson/main.go`
 
-```go
-// TestDecodeInvalidInput — tipo desconocido → error
-func TestDecodeInvalidInput(t *testing.T) { ... }
-
-// TestDecodeNotObject — JSON no es objeto → error
-func TestDecodeNotObject(t *testing.T) { ... }
-
-// TestDecodeFromBytes — input []byte
-func TestDecodeFromBytes(t *testing.T) { ... }
-```
-
-### 8.2 `tests/decode_types_test.go`
+El cliente usa la API antigua (`User` con struct tags, sin `Fielder`). Actualizar para usar la nueva API:
 
 ```go
-// TestDecodeInt        — writeValue con *int
-// TestDecodeInt32      — writeValue con *int32
-// TestDecodeFloat32    — writeValue con *float32
-// TestDecodeInt32FromFloat  — parser retorna float64 → *int32
-// TestDecodeIntFromFloat    — parser retorna float64 → *int
-// TestDecodeFloat32FromInt  — parser retorna int64  → *float32
-```
+//go:build wasm
 
-### 8.3 `tests/decode_nested_test.go`
-
-```go
-// TestDecodeStructNotFielder  — ptr no implementa Fielder → campo descartado
-// TestDecodeExtraNestedObject — campo desconocido objeto  → descartado
-// TestDecodeExtraArray        — campo desconocido array   → descartado
-```
-
-### 8.4 `tests/parser_string_test.go`
-
-```go
-// TestParseStringEscapeBF      — \b \f \/
-// TestParseStringUnicode       — \u0041 → 'A'
-// TestParseStringUnicodeShort  — \u004 (3 chars) → error
-// TestParseStringInvalidEscape — \q → error
-// TestParseStringUnexpectedEOF — sin cierre → error
-// TestParseStringNotQuote      — no empieza con " → error
-```
-
-### 8.5 `tests/parser_number_test.go`
-
-```go
-// TestParseNumberNegative   — -42 → int64(-42)
-// TestParseNumberScientific — 1e2 → float64(100)
-```
-
-### 8.6 `tests/parser_bool_null_test.go`
-
-```go
-// TestParseBoolFalse        — false → bool(false)
-// TestParseBoolInvalid      — tru   → error
-// TestParseBoolFalseInvalid — fals  → error
-// TestParseNullInvalid      — nul   → error
-```
-
-### 8.7 `tests/parser_array_test.go`
-
-```go
-// TestParseArrayEmpty          — [] → []any{}
-// TestParseArrayMissingBracket — {} → error
-// TestParseArrayBadSeparator   — [1;2] → error
-// TestParseValueArray          — [1,2,3] via parseValue
-// TestParseValueUnknownChar    — @invalid → error
-```
-
-### 8.8 `tests/parser_object_test.go`
-
-```go
-// TestParseObjectBadSeparator  — {"a":1;} → error
-// TestParseObjectMissingColon  — {"a" 1}  → error
-```
-
-### 8.9 `tests/parser_limits_test.go`
-
-```go
-// TestParseIntoFielderNotObject — input no es '{' → error
-// TestSkipWhitespace            — " \t\r\n{" → peek '{'
-// TestPeekNextEmpty             — data vacía → 0
-```
-
-```bash
-gotest
-```
-
----
-
-## Stage 9: Benchmarks vs `encoding/json`
-
-Cada archivo de bench es pequeño y tiene un nombre claro.
-
-### 9.1 `tests/bench_encode_test.go`
-
-```go
-package tests
+package main
 
 import (
-    stdjson "encoding/json"
-    "testing"
+    "syscall/js"
     "github.com/tinywasm/fmt"
     "github.com/tinywasm/json"
 )
 
-type benchUser struct {
+type User struct {
     Name  string
     Email string
     Age   int64
-    Score float64
 }
 
-func (u *benchUser) Schema() []fmt.Field {
+func (u *User) Schema() []fmt.Field {
     return []fmt.Field{
-        {Name: "Name", Type: fmt.FieldText, JSON: "name"},
+        {Name: "Name",  Type: fmt.FieldText, JSON: "name"},
         {Name: "Email", Type: fmt.FieldText, JSON: "email"},
-        {Name: "Age", Type: fmt.FieldInt, JSON: "age"},
-        {Name: "Score", Type: fmt.FieldFloat, JSON: "score"},
+        {Name: "Age",   Type: fmt.FieldInt,  JSON: "age"},
     }
 }
-func (u *benchUser) Values() []any   { return []any{u.Name, u.Email, u.Age, u.Score} }
-func (u *benchUser) Pointers() []any { return []any{&u.Name, &u.Email, &u.Age, &u.Score} }
+func (u *User) Values() []any   { return []any{u.Name, u.Email, u.Age} }
+func (u *User) Pointers() []any { return []any{&u.Name, &u.Email, &u.Age} }
 
-var benchInput = &benchUser{Name: "Alice", Email: "alice@example.com", Age: 30, Score: 9.5}
+func main() {
+    console := js.Global().Get("console")
+    document := js.Global().Get("document")
+    body := document.Get("body")
 
-func BenchmarkEncode_tinywasm(b *testing.B) {
-    var out string
-    b.ReportAllocs()
-    for i := 0; i < b.N; i++ {
-        if err := json.Encode(benchInput, &out); err != nil {
-            b.Fatal(err)
-        }
+    h1 := document.Call("createElement", "h1")
+    h1.Set("innerHTML", "JSON WASM Example")
+    body.Call("appendChild", h1)
+
+    user := &User{Name: "John Doe", Email: "john@example.com", Age: 30}
+
+    var jsonData []byte
+    if err := json.Encode(user, &jsonData); err != nil {
+        console.Call("error", "Encode error:", err.Error())
+        return
     }
-}
 
-func BenchmarkEncode_stdlib(b *testing.B) {
-    b.ReportAllocs()
-    for i := 0; i < b.N; i++ {
-        if _, err := stdjson.Marshal(benchInput); err != nil {
-            b.Fatal(err)
-        }
+    p1 := document.Call("createElement", "p")
+    p1.Set("innerHTML", "Encoded JSON: "+string(jsonData))
+    body.Call("appendChild", p1)
+
+    decoded := &User{}
+    if err := json.Decode(jsonData, decoded); err != nil {
+        console.Call("error", "Decode error:", err.Error())
+        return
     }
+
+    p2 := document.Call("createElement", "p")
+    p2.Set("innerHTML", "Decoded User: Name="+decoded.Name)
+    body.Call("appendChild", p2)
+
+    console.Call("log", "JSON example finished successfully")
+    select {}
 }
-```
-
-**Nota:** `benchUser` y `benchInput` se declaran en este archivo. Los otros bench files
-los usan porque comparten `package tests`.
-
-### 9.2 `tests/bench_decode_test.go`
-
-```go
-package tests
-
-import (
-    stdjson "encoding/json"
-    "testing"
-    "github.com/tinywasm/json"
-)
-
-var benchJSONStr = `{"name":"Alice","email":"alice@example.com","age":30,"score":9.5}`
-
-func BenchmarkDecode_tinywasm(b *testing.B) {
-    b.ReportAllocs()
-    for i := 0; i < b.N; i++ {
-        u := &benchUser{}
-        if err := json.Decode(benchJSONStr, u); err != nil {
-            b.Fatal(err)
-        }
-    }
-}
-
-func BenchmarkDecode_stdlib(b *testing.B) {
-    b.ReportAllocs()
-    for i := 0; i < b.N; i++ {
-        var u benchUser
-        if err := stdjson.Unmarshal([]byte(benchJSONStr), &u); err != nil {
-            b.Fatal(err)
-        }
-    }
-}
-```
-
-### 9.3 `tests/bench_roundtrip_test.go`
-
-```go
-package tests
-
-import (
-    stdjson "encoding/json"
-    "testing"
-    "github.com/tinywasm/json"
-)
-
-func BenchmarkRoundTrip_tinywasm(b *testing.B) {
-    b.ReportAllocs()
-    for i := 0; i < b.N; i++ {
-        var out string
-        if err := json.Encode(benchInput, &out); err != nil {
-            b.Fatal(err)
-        }
-        u := &benchUser{}
-        if err := json.Decode(out, u); err != nil {
-            b.Fatal(err)
-        }
-    }
-}
-
-func BenchmarkRoundTrip_stdlib(b *testing.B) {
-    b.ReportAllocs()
-    for i := 0; i < b.N; i++ {
-        data, err := stdjson.Marshal(benchInput)
-        if err != nil {
-            b.Fatal(err)
-        }
-        var u benchUser
-        if err := stdjson.Unmarshal(data, &u); err != nil {
-            b.Fatal(err)
-        }
-    }
-}
-```
-
-### 9.4 Actualizar `benchmarks/clients/tinyjson/main.go`
-
-El cliente WASM usa la API antigua (struct sin `Fielder`). Actualizar:
-- Hacer que `User` implemente `fmt.Fielder` (Schema/Values/Pointers).
-- Eliminar `json:"..."` struct tags.
-
-### 9.5 Verificación
-
-```bash
-gotest
-go test -bench=. -benchmem -count=3 ./tests/...
 ```
 
 ---
 
-## Stage 10: Documentación y Publish
+## Stage D: Actualizar benchmarks/README.md
 
-### 10.1 Actualizar `benchmarks/README.md`
-
-Reemplazar la sección **Performance Results** (resultados obsoletos de la arquitectura
-anterior con reflect) con los nuevos resultados de `go test -bench`:
+Ejecutar benchmarks y actualizar resultados:
 
 ```bash
 go test -bench=. -benchmem -count=3 ./tests/... 2>&1 | tee /tmp/bench.txt
 ```
 
-Estructura de la sección actualizada:
+Reemplazar la sección **Performance Results** en `benchmarks/README.md` con los nuevos resultados.
+Actualizar la fecha "Last updated".
+Corregir link roto `clients/json/main.go` → `clients/tinyjson/main.go` (si aún existe).
 
-```markdown
-## Performance Results
+---
 
-Last updated: <fecha>
-
-### Go Benchmark (`go test -bench`)
-
-| Benchmark | tinywasm/json | encoding/json | Δ allocs |
-|-----------|--------------|---------------|----------|
-| Encode    | X ns/op Y B/op Z allocs | ... | ... |
-| Decode    | X ns/op Y B/op Z allocs | ... | ... |
-| RoundTrip | X ns/op Y B/op Z allocs | ... | ... |
-
-> Run: `go test -bench=. -benchmem ./tests/...`
-
-### WASM Binary Size
-
-| Implementation | Binary Size (WASM + Gzip) |
-| :--- | :--- |
-| **tinywasm/json** | **~27 KB** |
-| encoding/json (stdlib) | ~119 KB |
-```
-
-También corregir el link roto: `clients/json/main.go` → `clients/tinyjson/main.go`.
-
-### 10.2 Actualizar `README.md` — sección Benchmarks
-
-El `benchmarks/README.md` ya referencia `../README.md#benchmarks` pero esa ancla
-**no existe**. Agregar la sección al README principal:
-
-```markdown
-## Benchmarks
-
-tinywasm/json es **77% más pequeño** que `encoding/json` en WASM (~27 KB vs ~119 KB)
-y **zero-reflect**, eliminando overhead de introspección.
-
-| Benchmark | tinywasm/json | encoding/json |
-|-----------|--------------|---------------|
-| Encode    | (resultado go test) | (resultado go test) |
-| Decode    | (resultado go test) | (resultado go test) |
-
-Ver resultados completos y análisis en [benchmarks/README.md](benchmarks/README.md).
-```
-
-También agregar el link a `benchmarks/README.md` en el índice del README principal
-junto a los demás documentos en `docs/`.
-
-### 10.3 Publicar
+## Stage E: Publicar
 
 ```bash
-gopush 'json: reorganize tests by domain, 100% coverage, benchmarks vs encoding/json'
+gopush 'json: 100% coverage, fix dead code in parser, update WASM client to Fielder API'
 ```
+
+Tag objetivo: `v0.2.0`
 
 ---
 
 ## Resumen
 
-| Stage | Archivos | Acción |
-|-------|----------|--------|
-| 6 | `tests/helpers_test.go` + 10 archivos migrate | Mover todos los tests existentes a `tests/`, divididos por dominio |
-| 6 | `encode_test.go`, `decode_test.go` (raíz) | **Eliminar** |
-| 7 | `tests/encode_output_test.go` | `TestEncodeToString`, `TestEncodeInvalidOutput` |
-| 7 | `tests/encode_types_test.go` | `TestEncodeNumericTypes` (int/int32/uint/float32/float64) |
-| 7 | `tests/encode_basic_test.go` | `TestEncodeStructNotFielder`, `TestEncodeControlChars` |
-| 8 | `tests/decode_input_test.go` | `TestDecodeInvalidInput`, `TestDecodeNotObject`, `TestDecodeFromBytes` |
-| 8 | `tests/decode_types_test.go` | `TestDecodeInt`, `TestDecodeInt32`, `TestDecodeFloat32`, coerciones |
-| 8 | `tests/decode_nested_test.go` | `TestDecodeStructNotFielder`, `TestDecodeExtraNestedObject`, `TestDecodeExtraArray` |
-| 8 | `tests/parser_string_test.go` | 6 tests: todos los escapes |
-| 8 | `tests/parser_number_test.go` | negativo, científica |
-| 8 | `tests/parser_bool_null_test.go` | bool/null y sus errores |
-| 8 | `tests/parser_array_test.go` | empty, bad sep, unknown char |
-| 8 | `tests/parser_object_test.go` | bad sep, missing colon |
-| 8 | `tests/parser_limits_test.go` | peek/next vacío, skipWhitespace, no `{` |
-| 9 | `tests/bench_encode_test.go` | BenchmarkEncode tinywasm vs stdlib |
-| 9 | `tests/bench_decode_test.go` | BenchmarkDecode tinywasm vs stdlib |
-| 9 | `tests/bench_roundtrip_test.go` | BenchmarkRoundTrip tinywasm vs stdlib |
-| 9 | `benchmarks/clients/tinyjson/main.go` | Actualizar User → Fielder |
-| 10 | `benchmarks/README.md` | Actualizar resultados obsoletos + corregir link roto `clients/json` → `clients/tinyjson` |
-| 10 | `README.md` | Agregar sección `#benchmarks` (ancla requerida por `benchmarks/README.md`) + link a `benchmarks/README.md` |
-
-## Estructura final de `tests/`
-
-```
-tests/
-├── helpers_test.go           — mockFielder
-├── encode_basic_test.go      — string, int, bool, nil, bytes, control chars, FieldStruct not Fielder
-├── encode_tags_test.go       — key, omitempty, "-", fallback, nested
-├── encode_output_test.go     — *[]byte, *string, io.Writer, error output
-├── encode_types_test.go      — todos los tipos numéricos
-├── decode_basic_test.go      — JSON → campos básicos
-├── decode_types_test.go      — *int, *int32, *float32, coerciones
-├── decode_input_test.go      — []byte, string, io.Reader, error
-├── decode_tags_test.go       — key, "-", missing, extra field
-├── decode_nested_test.go     — recursivo, ptr no Fielder, discard object/array
-├── parser_string_test.go     — todos los escapes, EOF, error
-├── parser_number_test.go     — int64, float64, negativo, científica
-├── parser_bool_null_test.go  — true, false, null, errores
-├── parser_array_test.go      — empty, values, errores
-├── parser_object_test.go     — keys, errores
-├── parser_limits_test.go     — peek/next vacío, whitespace, char desconocido, no `{`
-├── bench_encode_test.go      — BenchmarkEncode
-├── bench_decode_test.go      — BenchmarkDecode
-├── bench_roundtrip_test.go   — BenchmarkRoundTrip
-└── json_test.go              — integración end-to-end (existente)
-```
+| Stage | Archivo(s) | Acción |
+|-------|-----------|--------|
+| A | `encode_test.go`, `decode_test.go` (raíz) | **Eliminar** |
+| B | `parser.go` | Refactorizar `parseArray`/`parseObject` para eliminar dead code |
+| B | `tests/parser_string_test.go` | `TestParseStringUnicodeShort` (si falta) |
+| B | `tests/decode_types_test.go` | `TestDecodeInt64Ptr` |
+| B | `tests/encode_output_test.go` | `TestEncodeWriterError` |
+| B | `tests/encode_basic_test.go` | `TestEncodeFieldBytesNonBytes` |
+| C | `benchmarks/clients/tinyjson/main.go` | Migrar a API Fielder |
+| D | `benchmarks/README.md` | Actualizar resultados + fecha |
+| E | — | `gopush` con tag `v0.2.0` |
