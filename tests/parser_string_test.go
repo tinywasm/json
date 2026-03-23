@@ -9,7 +9,7 @@ import (
 func TestParseStringEscapeBF(t *testing.T) {
 	var s string
 	m := &mockFielder{
-		schema: []fmt.Field{{Name: "S", Type: fmt.FieldText, JSON: "s"}},
+		schema: []fmt.Field{{Name: "s", Type: fmt.FieldText}},
 		pointers: []any{&s},
 	}
 	input := `{"s":"\b\f\/"}`
@@ -25,7 +25,7 @@ func TestParseStringEscapeBF(t *testing.T) {
 func TestParseStringUnicode(t *testing.T) {
 	var s string
 	m := &mockFielder{
-		schema: []fmt.Field{{Name: "S", Type: fmt.FieldText, JSON: "s"}},
+		schema: []fmt.Field{{Name: "s", Type: fmt.FieldText}},
 		pointers: []any{&s},
 	}
 	input := `{"s":"\u0041"}`

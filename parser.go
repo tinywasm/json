@@ -349,8 +349,7 @@ func (p *parser) matchFieldIndex(schema []fmt.Field) (int, error) {
 			keyBytes := p.data[start:p.pos]
 			p.pos++ // consume closing '"'
 			for i, field := range schema {
-				k, _ := parseJSONTag(field)
-				if len(k) == len(keyBytes) && matchBytesStr(k, keyBytes) {
+				if len(field.Name) == len(keyBytes) && matchBytesStr(field.Name, keyBytes) {
 					return i, nil
 				}
 			}
@@ -363,8 +362,7 @@ func (p *parser) matchFieldIndex(schema []fmt.Field) (int, error) {
 				return -1, err
 			}
 			for i, field := range schema {
-				k, _ := parseJSONTag(field)
-				if k == key {
+				if field.Name == key {
 					return i, nil
 				}
 			}

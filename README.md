@@ -40,7 +40,7 @@ type User struct {
 }
 
 func (u *User) Schema() []fmt.Field {
-    return []fmt.Field{{Name: "Name", Type: fmt.FieldText, JSON: "name"}}
+    return []fmt.Field{{Name: "name", Type: fmt.FieldText}}
 }
 func (u *User) Pointers() []any { return []any{&u.Name} }
 
@@ -64,14 +64,21 @@ func main() {
 
 ### `Encode(data fmt.Fielder, output any) error`
 
-Serializes a `Fielder` to JSON.
+Serializes a `Fielder` to JSON. JSON keys are always taken from `field.Name`. If `field.OmitEmpty` is true, the field is skipped if its value is zero.
 
 - **data**: Must implement `fmt.Fielder`.
 - **output**: `*[]byte`, `*string`, or `io.Writer`.
 
 ### `Decode(input any, data fmt.Fielder) error`
 
-Parses JSON into a `Fielder`.
+Parses JSON into a `Fielder` and calls `Validate()` if the fielder implements `fmt.Validator`.
+
+- **input**: `[]byte`, `string`, or `io.Reader`.
+- **data**: Must implement `fmt.Fielder`.
+
+### `DecodeRaw(input any, data fmt.Fielder) error`
+
+Parses JSON into a `Fielder` without calling `Validate()`.
 
 - **input**: `[]byte`, `string`, or `io.Reader`.
 - **data**: Must implement `fmt.Fielder`.

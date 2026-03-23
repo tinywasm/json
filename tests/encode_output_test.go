@@ -9,7 +9,7 @@ import (
 
 func TestEncodeToBytes(t *testing.T) {
 	m := &mockFielder{
-		schema: []fmt.Field{{Name: "A", Type: fmt.FieldInt, JSON: "a"}},
+		schema: []fmt.Field{{Name: "a", Type: fmt.FieldInt}},
 		pointers: []any{ptrInt64(1)},
 	}
 	var out []byte
@@ -24,7 +24,7 @@ func TestEncodeToBytes(t *testing.T) {
 
 func TestEncodeToWriter(t *testing.T) {
 	m := &mockFielder{
-		schema: []fmt.Field{{Name: "A", Type: fmt.FieldInt, JSON: "a"}},
+		schema: []fmt.Field{{Name: "a", Type: fmt.FieldInt}},
 		pointers: []any{ptrInt64(1)},
 	}
 	var buf bytes.Buffer
@@ -40,7 +40,7 @@ func TestEncodeToWriter(t *testing.T) {
 // TestEncodeToString — output *string (ausente en tests originales)
 func TestEncodeToString(t *testing.T) {
 	m := &mockFielder{
-		schema: []fmt.Field{{Name: "A", Type: fmt.FieldInt, JSON: "a"}},
+		schema: []fmt.Field{{Name: "a", Type: fmt.FieldInt}},
 		pointers: []any{ptrInt64(1)},
 	}
 	var out string
@@ -56,7 +56,7 @@ func TestEncodeToString(t *testing.T) {
 // TestEncodeInvalidOutput — output desconocido → error
 func TestEncodeInvalidOutput(t *testing.T) {
 	m := &mockFielder{
-		schema: []fmt.Field{{Name: "A", Type: fmt.FieldInt, JSON: "a"}},
+		schema: []fmt.Field{{Name: "a", Type: fmt.FieldInt}},
 		pointers: []any{ptrInt64(1)},
 	}
 	if err := json.Encode(m, 123); err == nil {
@@ -72,7 +72,7 @@ func (e *errWriter) Write(p []byte) (n int, err error) {
 
 func TestEncodeWriterError(t *testing.T) {
 	m := &mockFielder{
-		schema: []fmt.Field{{Name: "V", Type: fmt.FieldText, JSON: "v"}},
+		schema: []fmt.Field{{Name: "v", Type: fmt.FieldText}},
 		pointers: []any{ptrString("hello")},
 	}
 	if err := json.Encode(m, &errWriter{}); err == nil {

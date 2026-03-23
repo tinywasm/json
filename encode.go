@@ -46,14 +46,7 @@ func encodeFielder(b *fmt.Conv, f fmt.Fielder) error {
 
 	first := true
 	for i, field := range schema {
-		key, omitempty := parseJSONTag(field)
-		if key == "-" {
-			continue
-		}
-
-		ptr := ptrs[i]
-
-		if omitempty && isZeroPtr(ptr, field.Type) {
+		if field.OmitEmpty && isZeroPtr(ptrs[i], field.Type) {
 			continue
 		}
 
@@ -63,11 +56,11 @@ func encodeFielder(b *fmt.Conv, f fmt.Fielder) error {
 		first = false
 
 		b.WriteByte('"')
-		fmt.JSONEscape(key, b)
+		fmt.JSONEscape(field.Name, b)
 		b.WriteByte('"')
 		b.WriteByte(':')
 
-		encodeFromPtr(b, ptr, field.Type)
+		encodeFromPtr(b, ptrs[i], field.Type)
 	}
 
 	b.WriteByte('}')
@@ -196,28 +189,3 @@ func isZeroPtr(ptr any, ft fmt.FieldType) bool {
 	return false
 }
 
-// parseJSONTag extracts key and omitempty from Field.JSON.
-func parseJSONTag(f fmt.Field) (key string, omitempty bool) {
-	tag := f.JSON
-	if tag == "" {
-		return f.Name, false
-	}
-	if tag == "-" {
-		return "-", false
-	}
-	comma := -1
-	for i := 0; i < len(tag); i++ {
-		if tag[i] == ',' {
-			comma = i
-			break
-		}
-	}
-	if comma < 0 {
-		return tag, false
-	}
-	key = tag[:comma]
-	if key == "" {
-		key = f.Name
-	}
-	return key, tag[comma+1:] == "omitempty"
-}

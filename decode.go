@@ -6,9 +6,23 @@ import (
 	"unsafe"
 )
 
-// Decode parses JSON into a Fielder.
+// Decode parses JSON into a Fielder and calls Validate() if implemented.
 // input: []byte | string | io.Reader.
 func Decode(input any, data fmt.Fielder) error {
+	if err := DecodeRaw(input, data); err != nil {
+		return err
+	}
+
+	// Post-decode validation
+	if v, ok := data.(fmt.Validator); ok {
+		return v.Validate()
+	}
+	return nil
+}
+
+// DecodeRaw parses JSON into a Fielder without calling Validate().
+// input: []byte | string | io.Reader.
+func DecodeRaw(input any, data fmt.Fielder) error {
 	var raw []byte
 	switch in := input.(type) {
 	case []byte:

@@ -15,16 +15,16 @@ type benchUser struct {
 }
 
 var benchSchema = []fmt.Field{
-	{Name: "Name", Type: fmt.FieldText, JSON: "name"},
-	{Name: "Email", Type: fmt.FieldText, JSON: "email"},
-	{Name: "Age", Type: fmt.FieldInt, JSON: "age"},
-	{Name: "Score", Type: fmt.FieldFloat, JSON: "score"},
+	{Name: "name", Type: fmt.FieldText},
+	{Name: "email", Type: fmt.FieldText},
+	{Name: "age", Type: fmt.FieldInt},
+	{Name: "score", Type: fmt.FieldFloat},
 }
 
 func (u *benchUser) Schema() []fmt.Field { return benchSchema }
 func (u *benchUser) Pointers() []any { return []any{&u.Name, &u.Email, &u.Age, &u.Score} }
 
-var benchInput = &benchUser{Name: "Alice", Email: "alice@example.com", Age: 30, Score: 9.5}
+var benchInput = &benchUser{Name: "alice", Email: "alice@example.com", Age: 30, Score: 9.5}
 
 func BenchmarkEncode_tinywasm(b *testing.B) {
     var out string
