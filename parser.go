@@ -36,32 +36,134 @@ func (p *parser) next() byte {
 	return 0
 }
 
-func (p *parser) parseValue() (any, error) {
+// skipString consumes a JSON string without allocation.
+// The opening '"' must already be consumed.
+func (p *parser) skipString() error {
+	for p.pos < len(p.data) {
+		c := p.data[p.pos]
+		if c == '"' {
+			p.pos++
+			return nil
+		}
+		if c == '\\' {
+			p.pos++
+			if p.pos >= len(p.data) {
+				return fmt.Err("json", "decode", "unexpected EOF")
+			}
+			esc := p.data[p.pos]
+			p.pos++
+			switch esc {
+			case '"', '\\', '/', 'b', 'f', 'n', 'r', 't':
+				// Valid
+			case 'u':
+				if p.pos+4 > len(p.data) {
+					return fmt.Err("json", "decode", "invalid unicode escape")
+				}
+				p.pos += 4
+			default:
+				return fmt.Err("json", "decode", "invalid escape sequence")
+			}
+			continue
+		}
+		p.pos++
+	}
+	return fmt.Err("json", "decode", "unexpected EOF")
+}
+
+// skipValue consumes a JSON value without allocating or returning it.
+// Used to discard unknown fields and unresolvable struct pointers.
+func (p *parser) skipValue() error {
 	p.skipWhitespace()
 	c := p.next()
 	switch c {
 	case '"':
-		return p.parseString()
+		return p.skipString()
 	case '{':
-		return p.parseObject()
+		return p.skipObject()
 	case '[':
-		return p.parseArray()
+		return p.skipArray()
 	case 't', 'f':
-		p.pos-- // back to 't' or 'f'
-		return p.parseBool()
+		p.pos--
+		_, err := p.parseBool()
+		return err
 	case 'n':
 		p.pos--
-		if err := p.parseNull(); err != nil {
-			return nil, err
-		}
-		return nil, nil
+		return p.parseNull()
 	default:
 		if (c >= '0' && c <= '9') || c == '-' {
 			p.pos--
-			return p.parseNumber()
+			return p.skipNumber()
 		}
-		return nil, fmt.Err("json", "decode", "unexpected character")
+		return fmt.Err("json", "decode", "unexpected character")
 	}
+}
+
+// skipObject consumes a JSON object without allocating map or keys.
+func (p *parser) skipObject() error {
+	p.skipWhitespace()
+	if p.peek() == '}' {
+		p.next()
+		return nil
+	}
+	for {
+		p.skipWhitespace()
+		if p.next() != '"' {
+			return fmt.Err("json", "decode", "expected quote")
+		}
+		if err := p.skipString(); err != nil {
+			return err
+		}
+		p.skipWhitespace()
+		if p.next() != ':' {
+			return fmt.Err("json", "decode", "expected :")
+		}
+		if err := p.skipValue(); err != nil {
+			return err
+		}
+		p.skipWhitespace()
+		c := p.next()
+		if c == '}' {
+			return nil
+		}
+		if c != ',' {
+			return fmt.Err("json", "decode", "expected , or }")
+		}
+	}
+}
+
+// skipArray consumes a JSON array without allocating []any.
+func (p *parser) skipArray() error {
+	p.skipWhitespace()
+	if p.peek() == ']' {
+		p.next()
+		return nil
+	}
+	for {
+		if err := p.skipValue(); err != nil {
+			return err
+		}
+		p.skipWhitespace()
+		c := p.next()
+		if c == ']' {
+			return nil
+		}
+		if c != ',' {
+			return fmt.Err("json", "decode", "expected , or ]")
+		}
+	}
+}
+
+// skipNumber consumes a JSON number without returning any value.
+func (p *parser) skipNumber() error {
+	for p.pos < len(p.data) {
+		c := p.data[p.pos]
+		if (c >= '0' && c <= '9') || c == '-' || c == '+' || c == '.' || c == 'e' || c == 'E' {
+			p.pos++
+		} else {
+			break
+		}
+	}
+	return nil
 }
 
 // parseString parses a JSON string. The opening '"' must already be consumed.
@@ -141,27 +243,6 @@ func (p *parser) parseStringEscape(start int) (string, error) {
 		}
 	}
 	return "", fmt.Err("json", "decode", "unexpected EOF")
-}
-
-func (p *parser) parseNumber() (any, error) {
-	start := p.pos
-	isFloat := false
-	for p.pos < len(p.data) {
-		c := p.peek()
-		if (c >= '0' && c <= '9') || c == '-' || c == '.' || c == 'e' || c == 'E' || c == '+' {
-			if c == '.' || c == 'e' || c == 'E' {
-				isFloat = true
-			}
-			p.pos++
-		} else {
-			break
-		}
-	}
-	s := string(p.data[start:p.pos])
-	if isFloat {
-		return fmt.Convert(s).Float64()
-	}
-	return fmt.Convert(s).Int64()
 }
 
 // parseNumberInto parses a JSON number directly into a typed pointer.
@@ -308,33 +389,7 @@ func (p *parser) parseIntoPtr(ptr any, ft fmt.FieldType) error {
 	}
 
 	// Fallback for unknown field types
-	_, err := p.parseValue()
-	return err
-}
-
-func (p *parser) parseArray() ([]any, error) {
-	var res []any
-	p.skipWhitespace()
-	if p.peek() == ']' {
-		p.next()
-		return res, nil
-	}
-	for {
-		val, err := p.parseValue()
-		if err != nil {
-			return nil, err
-		}
-		res = append(res, val)
-		p.skipWhitespace()
-		c := p.next()
-		if c == ']' {
-			break
-		}
-		if c != ',' {
-			return nil, fmt.Err("json", "decode", "expected , or ]")
-		}
-	}
-	return res, nil
+	return p.skipValue()
 }
 
 // matchFieldIndex matches the current JSON key (bytes between pos and closing '"')
@@ -418,7 +473,7 @@ func (p *parser) parseIntoFielder(f fmt.Fielder) error {
 
 		if fieldIdx < 0 {
 			// Unknown field: parse and discard
-			if _, err := p.parseValue(); err != nil {
+			if err := p.skipValue(); err != nil {
 				return err
 			}
 		} else {
@@ -431,7 +486,7 @@ func (p *parser) parseIntoFielder(f fmt.Fielder) error {
 						return err
 					}
 				} else {
-					if _, err := p.parseValue(); err != nil {
+					if err := p.skipValue(); err != nil {
 						return err
 					}
 				}
@@ -454,39 +509,3 @@ func (p *parser) parseIntoFielder(f fmt.Fielder) error {
 	return nil
 }
 
-func (p *parser) parseObject() (map[string]any, error) {
-	res := make(map[string]any)
-	p.skipWhitespace()
-	if p.peek() == '}' {
-		p.next()
-		return res, nil
-	}
-	for {
-		p.skipWhitespace()
-		if p.next() != '"' {
-			return nil, fmt.Err("json", "decode", "expected quote")
-		}
-		key, err := p.parseString()
-		if err != nil {
-			return nil, err
-		}
-		p.skipWhitespace()
-		if p.next() != ':' {
-			return nil, fmt.Err("json", "decode", "expected :")
-		}
-		val, err := p.parseValue()
-		if err != nil {
-			return nil, err
-		}
-		res[key] = val
-		p.skipWhitespace()
-		c := p.next()
-		if c == '}' {
-			break
-		}
-		if c != ',' {
-			return nil, fmt.Err("json", "decode", "expected , or }")
-		}
-	}
-	return res, nil
-}
