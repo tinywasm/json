@@ -9,7 +9,7 @@ import (
 func TestParseNumberNegative(t *testing.T) {
 	var n int64
 	m := &mockFielder{
-		schema: []fmt.Field{{Name: "N", Type: fmt.FieldInt, JSON: "n"}},
+		schema: []fmt.Field{{Name: "n", Type: fmt.FieldInt}},
 		pointers: []any{&n},
 	}
 	input := `{"n":-42}`
@@ -24,7 +24,7 @@ func TestParseNumberNegative(t *testing.T) {
 func TestParseNumberScientific(t *testing.T) {
 	var f float64
 	m := &mockFielder{
-		schema: []fmt.Field{{Name: "F", Type: fmt.FieldFloat, JSON: "f"}},
+		schema: []fmt.Field{{Name: "f", Type: fmt.FieldFloat}},
 		pointers: []any{&f},
 	}
 	input := `{"f":1e2}`

@@ -11,7 +11,7 @@ func TestDecodeStructNotFielder(t *testing.T) {
 	var s string = "initial"
 	m := &mockFielder{
 		schema: []fmt.Field{
-			{Name: "Nested", Type: fmt.FieldStruct, JSON: "nested"},
+			{Name: "nested", Type: fmt.FieldStruct},
 		},
 		pointers: []any{&s}, // string doesn't implement Fielder
 	}

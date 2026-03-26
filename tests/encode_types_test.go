@@ -25,7 +25,7 @@ func TestEncodeNumericTypes(t *testing.T) {
     for _, c := range cases {
         t.Run(c.name, func(t *testing.T) {
             m := &mockFielder{
-                schema: []fmt.Field{{Name: "V", Type: c.ft, JSON: "v"}},
+                schema: []fmt.Field{{Name: "v", Type: c.ft}},
                 pointers: []any{c.ptr},
             }
             var out string

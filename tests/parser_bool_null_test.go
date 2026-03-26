@@ -9,7 +9,7 @@ import (
 func TestParseBoolFalse(t *testing.T) {
 	var b bool = true
 	m := &mockFielder{
-		schema: []fmt.Field{{Name: "B", Type: fmt.FieldBool, JSON: "b"}},
+		schema: []fmt.Field{{Name: "b", Type: fmt.FieldBool}},
 		pointers: []any{&b},
 	}
 	if err := json.Decode(`{"b":false}`, m); err != nil {

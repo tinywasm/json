@@ -13,8 +13,8 @@ type TestStruct struct {
 
 func (s *TestStruct) Schema() []fmt.Field {
 	return []fmt.Field{
-		{Name: "Name", Type: fmt.FieldText, JSON: "name"},
-		{Name: "Age", Type: fmt.FieldInt, JSON: "age"},
+		{Name: "name", Type: fmt.FieldText},
+		{Name: "age", Type: fmt.FieldInt},
 	}
 }
 
@@ -24,13 +24,13 @@ func (s *TestStruct) Pointers() []any {
 
 func TestIntegration(t *testing.T) {
 	t.Run("Encode Fielder", func(t *testing.T) {
-		input := &TestStruct{Name: "Alice", Age: 30}
+		input := &TestStruct{Name: "alice", Age: 30}
 		var result string
 		err := json.Encode(input, &result)
 		if err != nil {
 			t.Fatalf("Encode failed: %v", err)
 		}
-		expected := `{"name":"Alice","age":30}`
+		expected := `{"name":"alice","age":30}`
 		if result != expected {
 			t.Errorf("Expected %s, got %s", expected, result)
 		}

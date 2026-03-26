@@ -6,45 +6,11 @@ import (
 	"testing"
 )
 
-func TestDecodeJSONKey(t *testing.T) {
-	var firstName string
-	m := &mockFielder{
-		schema: []fmt.Field{
-			{Name: "FirstName", Type: fmt.FieldText, JSON: "first_name"},
-		},
-		pointers: []any{&firstName},
-	}
-	input := `{"first_name":"Alice"}`
-	if err := json.Decode(input, m); err != nil {
-		t.Fatal(err)
-	}
-	if firstName != "Alice" {
-		t.Errorf("got %s", firstName)
-	}
-}
-
-func TestDecodeJSONExclude(t *testing.T) {
-	secret := "initial"
-	m := &mockFielder{
-		schema: []fmt.Field{
-			{Name: "Secret", Type: fmt.FieldText, JSON: "-"},
-		},
-		pointers: []any{&secret},
-	}
-	input := `{"Secret":"new"}`
-	if err := json.Decode(input, m); err != nil {
-		t.Fatal(err)
-	}
-	if secret != "initial" {
-		t.Errorf("secret changed to %s", secret)
-	}
-}
-
 func TestDecodeMissingField(t *testing.T) {
 	age := int64(20)
 	m := &mockFielder{
 		schema: []fmt.Field{
-			{Name: "Age", Type: fmt.FieldInt, JSON: "age"},
+			{Name: "age", Type: fmt.FieldInt},
 		},
 		pointers: []any{&age},
 	}
@@ -61,7 +27,7 @@ func TestDecodeExtraField(t *testing.T) {
 	var name string
 	m := &mockFielder{
 		schema: []fmt.Field{
-			{Name: "Name", Type: fmt.FieldText, JSON: "name"},
+			{Name: "name", Type: fmt.FieldText},
 		},
 		pointers: []any{&name},
 	}

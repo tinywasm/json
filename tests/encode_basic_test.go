@@ -9,9 +9,9 @@ import (
 func TestEncodeSimple(t *testing.T) {
 	m := &mockFielder{
 		schema: []fmt.Field{
-			{Name: "Name", Type: fmt.FieldText, JSON: "name"},
-			{Name: "Age", Type: fmt.FieldInt, JSON: "age"},
-			{Name: "Active", Type: fmt.FieldBool, JSON: "active"},
+			{Name: "name", Type: fmt.FieldText},
+			{Name: "age", Type: fmt.FieldInt},
+			{Name: "active", Type: fmt.FieldBool},
 		},
 		pointers: []any{ptrString("Alice"), ptrInt64(30), ptrBool(true)},
 	}
@@ -27,12 +27,12 @@ func TestEncodeSimple(t *testing.T) {
 
 func TestEncodeFielderError(t *testing.T) {
 	inner := &mockFielder{
-		schema: []fmt.Field{{Name: "E", Type: fmt.FieldText, JSON: "e"}},
+		schema: []fmt.Field{{Name: "e", Type: fmt.FieldText}},
 		pointers: []any{nil},
 		err:    fmt.Err("test", "encode", "error"),
 	}
 	outer := &mockFielder{
-		schema: []fmt.Field{{Name: "I", Type: fmt.FieldStruct, JSON: "i"}},
+		schema: []fmt.Field{{Name: "i", Type: fmt.FieldStruct}},
 		pointers: []any{inner},
 	}
 	var out string
@@ -46,7 +46,7 @@ func TestEncodeFieldBytesNonBytes(t *testing.T) {
 	// Actually encodeValue handles it via default (fmt.Convert).
 	// To trigger default in encodeValue with something that is NOT handled by other cases:
 	m := &mockFielder{
-		schema: []fmt.Field{{Name: "V", Type: fmt.FieldBlob, JSON: "v"}},
+		schema: []fmt.Field{{Name: "v", Type: fmt.FieldBlob}},
 		pointers: []any{ptrInt(42)}, // Not []byte, not string, not bool, not nil
 	}
 	var out string
@@ -67,7 +67,7 @@ func TestEncodeFieldBytesNonBytes(t *testing.T) {
 func TestEncodeStringEscaping(t *testing.T) {
 	m := &mockFielder{
 		schema: []fmt.Field{
-			{Name: "Msg", Type: fmt.FieldText, JSON: "msg"},
+			{Name: "msg", Type: fmt.FieldText},
 		},
 		pointers: []any{ptrString("hello \"world\"\n\r\t\\")},
 	}
@@ -84,7 +84,7 @@ func TestEncodeStringEscaping(t *testing.T) {
 func TestEncodeNilField(t *testing.T) {
 	m := &mockFielder{
 		schema: []fmt.Field{
-			{Name: "Val", Type: fmt.FieldText, JSON: "val"},
+			{Name: "val", Type: fmt.FieldText},
 		},
 		pointers: []any{nil},
 	}
@@ -101,7 +101,7 @@ func TestEncodeNilField(t *testing.T) {
 func TestEncodeBytes(t *testing.T) {
 	m := &mockFielder{
 		schema: []fmt.Field{
-			{Name: "Data", Type: fmt.FieldBlob, JSON: "data"},
+			{Name: "data", Type: fmt.FieldBlob},
 		},
 		pointers: []any{ptrBytes([]byte("hello"))},
 	}
@@ -119,7 +119,7 @@ func TestEncodeBytes(t *testing.T) {
 func TestEncodeStructNotFielder(t *testing.T) {
 	m := &mockFielder{
 		schema: []fmt.Field{
-			{Name: "User", Type: fmt.FieldStruct, JSON: "user"},
+			{Name: "user", Type: fmt.FieldStruct},
 		},
 		pointers: []any{ptrString("not-a-fielder")},
 	}
@@ -137,7 +137,7 @@ func TestEncodeStructNotFielder(t *testing.T) {
 func TestEncodeControlChars(t *testing.T) {
 	m := &mockFielder{
 		schema: []fmt.Field{
-			{Name: "Msg", Type: fmt.FieldText, JSON: "msg"},
+			{Name: "msg", Type: fmt.FieldText},
 		},
 		pointers: []any{ptrString("\x01\x1f")},
 	}
