@@ -17,14 +17,10 @@ type User struct {
 
 func (u *User) Schema() []fmt.Field {
 	return []fmt.Field{
-		{Name: "Name", Type: fmt.FieldText, JSON: "name"},
-		{Name: "Email", Type: fmt.FieldText, JSON: "email"},
-		{Name: "Age", Type: fmt.FieldInt, JSON: "age"},
+		{Name: "name", Type: fmt.FieldText},
+		{Name: "email", Type: fmt.FieldText},
+		{Name: "age", Type: fmt.FieldInt},
 	}
-}
-
-func (u *User) Values() []any {
-	return []any{u.Name, u.Email, u.Age}
 }
 
 func (u *User) Pointers() []any {

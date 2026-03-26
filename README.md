@@ -87,9 +87,9 @@ tinywasm/json is **77% smaller** than `encoding/json` in WASM (~27 KB vs ~119 KB
 and **zero-reflect**, eliminating reflection overhead and heavy dependencies.
 
 | Benchmark | tinywasm/json | encoding/json |
-|-----------|--------------|---------------|
-| Encode    | 641 ns/op    | 573 ns/op     |
-| Decode    | 1709 ns/op   | 2184 ns/op    |
+|-----------|---------------|---------------|
+| Encode    | 285 ns/op     | 276 ns/op     |
+| Decode    | 320 ns/op     | 1078 ns/op    |
 
 See full results and analysis in [benchmarks/README.md](benchmarks/README.md).
 
