@@ -6,23 +6,9 @@ import (
 	"unsafe"
 )
 
-// Decode parses JSON into a Fielder and calls Validate() if implemented.
+// Decode parses JSON into a Fielder.
 // input: []byte | string | io.Reader.
 func Decode(input any, data fmt.Fielder) error {
-	if err := DecodeRaw(input, data); err != nil {
-		return err
-	}
-
-	// Post-decode validation
-	if v, ok := data.(fmt.Validator); ok {
-		return v.Validate()
-	}
-	return nil
-}
-
-// DecodeRaw parses JSON into a Fielder without calling Validate().
-// input: []byte | string | io.Reader.
-func DecodeRaw(input any, data fmt.Fielder) error {
 	var raw []byte
 	switch in := input.(type) {
 	case []byte:
@@ -49,72 +35,4 @@ func DecodeRaw(input any, data fmt.Fielder) error {
 
 	p := parser{data: raw}
 	return p.parseIntoFielder(data)
-}
-
-// writeValue writes a parsed JSON value into a Go pointer.
-// Uses fmt.Convert for type coercion where needed.
-func writeValue(ptr any, ft fmt.FieldType, val any) {
-	switch ft {
-	case fmt.FieldText:
-		if p, ok := ptr.(*string); ok {
-			if s, ok := val.(string); ok {
-				*p = s
-			}
-		}
-	case fmt.FieldInt:
-		// Parser returns int64 for integers, float64 for decimals.
-		// Support *int, *int32, *int64 via type switches on ptr.
-		switch p := ptr.(type) {
-		case *int64:
-			switch v := val.(type) {
-			case int64:
-				*p = v
-			case float64:
-				*p = int64(v)
-			}
-		case *int:
-			switch v := val.(type) {
-			case int64:
-				*p = int(v)
-			case float64:
-				*p = int(v)
-			}
-		case *int32:
-			switch v := val.(type) {
-			case int64:
-				*p = int32(v)
-			case float64:
-				*p = int32(v)
-			}
-		}
-	case fmt.FieldFloat:
-		switch p := ptr.(type) {
-		case *float64:
-			switch v := val.(type) {
-			case float64:
-				*p = v
-			case int64:
-				*p = float64(v)
-			}
-		case *float32:
-			switch v := val.(type) {
-			case float64:
-				*p = float32(v)
-			case int64:
-				*p = float32(v)
-			}
-		}
-	case fmt.FieldBool:
-		if p, ok := ptr.(*bool); ok {
-			if b, ok := val.(bool); ok {
-				*p = b
-			}
-		}
-	case fmt.FieldBlob:
-		if p, ok := ptr.(*[]byte); ok {
-			if s, ok := val.(string); ok {
-				*p = []byte(s)
-			}
-		}
-	}
 }

@@ -21,10 +21,10 @@ mkdir -p "$OUTPUT_DIR"
 # Set source directory based on parameter
 if [ "$USE_STDLIB" = true ]; then
     echo "Building with encoding/json (stdlib)..."
-    SOURCE_DIR="clients/stdlib"
+    SOURCE_DIR="./clients/stdlib"
 else
     echo "Building with JSON..."
-    SOURCE_DIR="clients/json"
+    SOURCE_DIR="./clients/tinyjson"
 fi
 
 # Build the WASM binary

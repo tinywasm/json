@@ -57,6 +57,11 @@ func main() {
     if err := json.Decode(out, &result); err != nil {
         panic(err)
     }
+
+    // Recommended: Explicit validation (if result implements fmt.Validator or uses fmt.ValidateFields)
+    // if err := fmt.ValidateFields('c', &result); err != nil {
+    //     panic(err)
+    // }
 }
 ```
 
@@ -71,14 +76,7 @@ Serializes a `Fielder` to JSON. JSON keys are always taken from `field.Name`. If
 
 ### `Decode(input any, data fmt.Fielder) error`
 
-Parses JSON into a `Fielder` and calls `Validate()` if the fielder implements `fmt.Validator`.
-
-- **input**: `[]byte`, `string`, or `io.Reader`.
-- **data**: Must implement `fmt.Fielder`.
-
-### `DecodeRaw(input any, data fmt.Fielder) error`
-
-Parses JSON into a `Fielder` without calling `Validate()`.
+Parses JSON into a Fielder.
 
 - **input**: `[]byte`, `string`, or `io.Reader`.
 - **data**: Must implement `fmt.Fielder`.
@@ -89,9 +87,9 @@ tinywasm/json is **77% smaller** than `encoding/json` in WASM (~27 KB vs ~119 KB
 and **zero-reflect**, eliminating reflection overhead and heavy dependencies.
 
 | Benchmark | tinywasm/json | encoding/json |
-|-----------|--------------|---------------|
-| Encode    | 641 ns/op    | 573 ns/op     |
-| Decode    | 1709 ns/op   | 2184 ns/op    |
+|-----------|---------------|---------------|
+| Encode    | 285 ns/op     | 276 ns/op     |
+| Decode    | 320 ns/op     | 1078 ns/op    |
 
 See full results and analysis in [benchmarks/README.md](benchmarks/README.md).
 

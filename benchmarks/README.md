@@ -42,15 +42,15 @@ Both files implement the same functionality to ensure fair comparison.
 
 ## Performance Results
 
-Last updated: 2026-03-13
+Last updated: 2026-03-26
 
 ### Go Benchmark (`go test -bench`)
 
 | Benchmark | tinywasm/json | encoding/json | Δ allocs |
-|-----------|--------------|---------------|----------|
-| Encode    | 648 ns/op 144 B/op 2 allocs | 555 ns/op 80 B/op 1 allocs | +1 |
-| Decode    | 732 ns/op 157 B/op 5 allocs | 2227 ns/op 376 B/op 8 allocs | -3 |
-| RoundTrip | 1510 ns/op 317 B/op 8 allocs | 2576 ns/op 376 B/op 8 allocs | 0 |
+|-----------|---------------|---------------|----------|
+| Encode    | 285 ns/op 144 B/op 2 allocs | 276 ns/op 80 B/op 1 allocs | +1 |
+| Decode    | 320 ns/op 157 B/op 5 allocs | 1078 ns/op 376 B/op 8 allocs | -3 |
+| RoundTrip | 661 ns/op 317 B/op 8 allocs | 1324 ns/op 376 B/op 8 allocs | 0 |
 
 > Run: `go test -bench=. -benchmem ./tests/...`
 
@@ -63,9 +63,9 @@ Last updated: 2026-03-13
 
 ### Analysis
 
-**tinywasm/json is 77% smaller** (~27 KB vs ~119 KB) making it ideal for web apps where bundle size matters. While stdlib is faster, tinywasm/json eliminates the `reflect` package, significantly reducing the final WASM binary size.
+**tinywasm/json is 77% smaller** (~27 KB vs ~119 KB) making it ideal for web apps where bundle size matters. By eliminating the `reflect` package, it not only significantly reduces the final WASM binary size, but also makes **decoding ~3.3x faster** and **roundtripping 2x faster** than the standard library.
 
-**Use tinywasm/json when:** Bundle size is critical, slow connections, or running in restricted WASM environments.
-**Use Stdlib when:** Performance is the only metric and bundle size isn't a concern.
+**Use tinywasm/json when:** Bundle size and raw decoding performance are critical, or running in restricted WASM environments.
+**Use Stdlib when:** You need to work dynamically with arbitrary unknown schemas (like `map[string]any`), as tinywasm/json is optimized strictly for predefined structs (`fmt.Fielder`).
 
 See the [main README](../README.md#benchmarks) for detailed benchmark results.
