@@ -57,6 +57,11 @@ func main() {
     if err := json.Decode(out, &result); err != nil {
         panic(err)
     }
+
+    // Recommended: Explicit validation (if result implements fmt.Validator or uses fmt.ValidateFields)
+    // if err := fmt.ValidateFields('c', &result); err != nil {
+    //     panic(err)
+    // }
 }
 ```
 
@@ -71,14 +76,7 @@ Serializes a `Fielder` to JSON. JSON keys are always taken from `field.Name`. If
 
 ### `Decode(input any, data fmt.Fielder) error`
 
-Parses JSON into a `Fielder` and calls `Validate()` if the fielder implements `fmt.Validator`.
-
-- **input**: `[]byte`, `string`, or `io.Reader`.
-- **data**: Must implement `fmt.Fielder`.
-
-### `DecodeRaw(input any, data fmt.Fielder) error`
-
-Parses JSON into a `Fielder` without calling `Validate()`.
+Parses JSON into a Fielder.
 
 - **input**: `[]byte`, `string`, or `io.Reader`.
 - **data**: Must implement `fmt.Fielder`.
