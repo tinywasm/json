@@ -386,6 +386,39 @@ func (p *parser) parseIntoPtr(ptr any, ft fmt.FieldType) error {
 			*bp = []byte(s)
 		}
 		return nil
+	case fmt.FieldIntSlice:
+		if p.peek() != '[' {
+			return fmt.Err("json", "decode", "expected array for int slice")
+		}
+		p.next() // consume '['
+		p.skipWhitespace()
+		sp, ok := ptr.(*[]int)
+		if !ok {
+			return p.skipArray()
+		}
+		if p.peek() == ']' {
+			p.next()
+			*sp = []int{}
+			return nil
+		}
+		var result []int
+		for {
+			var v int
+			if err := p.parseNumberInto(&v, fmt.FieldInt); err != nil {
+				return err
+			}
+			result = append(result, v)
+			p.skipWhitespace()
+			c := p.next()
+			if c == ']' {
+				break
+			}
+			if c != ',' {
+				return fmt.Err("json", "decode", "expected , or ]")
+			}
+		}
+		*sp = result
+		return nil
 	}
 
 	// Fallback for unknown field types

@@ -7,6 +7,7 @@ A single, platform-agnostic JSON codec for Go that optimizes WebAssembly binary 
 - [Architecture](#architecture)
 - [Usage](#usage)
 - [API](#api)
+- [Supported Types & Limitations](#supported-types-and-limitations)
 - [Benchmarks](#benchmarks)
 - [Contributing](#contributing)
 - [License](#license)
@@ -78,6 +79,31 @@ Parses JSON into a Fielder.
 
 - **input**: `[]byte`, `string`, or `io.Reader`.
 - **data**: Must implement `fmt.Fielder`.
+
+## Supported Types and Limitations
+
+To maintain a minimal footprint and zero reflection, `tinywasm/json` has specific support and constraints:
+
+### Supported Field Types
+The encoder and decoder directly support the following `fmt.FieldType` mappings:
+
+| Go Type | `fmt.FieldType` | JSON Equivalent |
+|---------|-----------------|-----------------|
+| `string` | `FieldText` | `string` |
+| `int`, `int64`, etc. | `FieldInt` | `number` |
+| `float64`, `float32` | `FieldFloat` | `number` |
+| `bool` | `FieldBool` | `boolean` |
+| `[]byte` | `FieldBlob` | `string` (escaped) |
+| `[]int` | `FieldIntSlice` | `array` of `numbers` |
+| `Fielder` | `FieldStruct` | `object` (nested) |
+
+### Limitations
+- **No Reflection**: Generic types like `map[string]any`, `[]any`, or arbitrary structs NOT implementing `fmt.Fielder` are NOT supported.
+- **Root Object Only**: Both `Encode` and `Decode` expect a `fmt.Fielder` as the root element. You cannot directly encode/decode a bare string or number as a standalone JSON value.
+- **No Maps**: Key-value pairs are only supported via struct fields described in the `Schema()`.
+- **Simplified Arrays**: Currently, only `[]int` is supported as a slice type. Other slice types like `[]string` or `[]float64` are not yet supported.
+- **No Custom Marshaling**: Standard interfaces like `json.Marshaler` or `json.Unmarshaler` are ignored.
+- **Fielder Contract**: Structs must return pointers to all fields in the same order as the schema via `Pointers()`.
 
 ## Benchmarks
 

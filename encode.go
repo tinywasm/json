@@ -135,6 +135,19 @@ func encodeFromPtr(b *fmt.Conv, ptr any, ft fmt.FieldType) {
 		} else {
 			b.WriteString("null")
 		}
+	case fmt.FieldIntSlice:
+		if p, ok := ptr.(*[]int); ok {
+			b.WriteByte('[')
+			for i, v := range *p {
+				if i > 0 {
+					b.WriteByte(',')
+				}
+				b.WriteInt(int64(v))
+			}
+			b.WriteByte(']')
+		} else {
+			b.WriteString("null")
+		}
 	default:
 		b.WriteString("null")
 	}
@@ -183,6 +196,10 @@ func isZeroPtr(ptr any, ft fmt.FieldType) bool {
 		}
 	case fmt.FieldBlob:
 		if p, ok := ptr.(*[]byte); ok {
+			return len(*p) == 0
+		}
+	case fmt.FieldIntSlice:
+		if p, ok := ptr.(*[]int); ok {
 			return len(*p) == 0
 		}
 	}
