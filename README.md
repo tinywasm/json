@@ -96,12 +96,13 @@ The encoder and decoder directly support the following `fmt.FieldType` mappings:
 | `[]byte` | `FieldBlob` | `string` (escaped) |
 | `[]int` | `FieldIntSlice` | `array` of `numbers` |
 | `Fielder` | `FieldStruct` | `object` (nested) |
+| `[]Fielder` | `FieldStructSlice` | `array` of `objects` |
 
 ### Limitations
 - **No Reflection**: Generic types like `map[string]any`, `[]any`, or arbitrary structs NOT implementing `fmt.Fielder` are NOT supported.
 - **Root Object Only**: Both `Encode` and `Decode` expect a `fmt.Fielder` as the root element. You cannot directly encode/decode a bare string or number as a standalone JSON value.
 - **No Maps**: Key-value pairs are only supported via struct fields described in the `Schema()`.
-- **Simplified Arrays**: Currently, only `[]int` is supported as a slice type. Other slice types like `[]string` or `[]float64` are not yet supported.
+- **Simplified Arrays**: Supported slice types include `[]int` and collections of objects (via `FieldStructSlice`). Other types like `[]string` or `[]float64` are not yet supported.
 - **No Custom Marshaling**: Standard interfaces like `json.Marshaler` or `json.Unmarshaler` are ignored.
 - **Fielder Contract**: Structs must return pointers to all fields in the same order as the schema via `Pointers()`.
 

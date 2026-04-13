@@ -419,6 +419,36 @@ func (p *parser) parseIntoPtr(ptr any, ft fmt.FieldType) error {
 		}
 		*sp = result
 		return nil
+	case fmt.FieldStructSlice:
+		if p.peek() != '[' {
+			return fmt.Err("json", "decode", "expected array for struct slice")
+		}
+		p.next() // consume '['
+		p.skipWhitespace()
+		fs, ok := ptr.(FielderSlice)
+		if !ok {
+			return p.skipArray()
+		}
+		if p.peek() == ']' {
+			p.next()
+			return nil
+		}
+		for {
+			nested := fs.Append()
+			if err := p.parseIntoFielder(nested); err != nil {
+				return err
+			}
+			p.skipWhitespace()
+			c := p.next()
+			if c == ']' {
+				break
+			}
+			if c != ',' {
+				return fmt.Err("json", "decode", "expected , or ]")
+			}
+			p.skipWhitespace()
+		}
+		return nil
 	}
 
 	// Fallback for unknown field types
@@ -517,6 +547,37 @@ func (p *parser) parseIntoFielder(f fmt.Fielder) error {
 				if nested, ok := ptr.(fmt.Fielder); ok {
 					if err := p.parseIntoFielder(nested); err != nil {
 						return err
+					}
+				} else {
+					if err := p.skipValue(); err != nil {
+						return err
+					}
+				}
+			} else if field.Type == fmt.FieldStructSlice {
+				if nested, ok := ptr.(FielderSlice); ok {
+					if p.peek() != '[' {
+						return fmt.Err("json", "decode", "expected array for struct slice")
+					}
+					p.next() // consume '['
+					p.skipWhitespace()
+					if p.peek() == ']' {
+						p.next()
+					} else {
+						for {
+							it := nested.Append()
+							if err := p.parseIntoFielder(it); err != nil {
+								return err
+							}
+							p.skipWhitespace()
+							c := p.next()
+							if c == ']' {
+								break
+							}
+							if c != ',' {
+								return fmt.Err("json", "decode", "expected , or ]")
+							}
+							p.skipWhitespace()
+						}
 					}
 				} else {
 					if err := p.skipValue(); err != nil {
