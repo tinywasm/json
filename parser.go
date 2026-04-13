@@ -425,7 +425,7 @@ func (p *parser) parseIntoPtr(ptr any, ft fmt.FieldType) error {
 		}
 		p.next() // consume '['
 		p.skipWhitespace()
-		fs, ok := ptr.(FielderSlice)
+		fs, ok := ptr.(fmt.FielderSlice)
 		if !ok {
 			return p.skipArray()
 		}
@@ -554,7 +554,7 @@ func (p *parser) parseIntoFielder(f fmt.Fielder) error {
 					}
 				}
 			} else if field.Type == fmt.FieldStructSlice {
-				if nested, ok := ptr.(FielderSlice); ok {
+				if nested, ok := ptr.(fmt.FielderSlice); ok {
 					if p.peek() != '[' {
 						return fmt.Err("json", "decode", "expected array for struct slice")
 					}

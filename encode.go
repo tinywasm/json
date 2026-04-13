@@ -5,14 +5,6 @@ import (
 	"io"
 )
 
-// FielderSlice is implemented by generated code to allow
-// iteration over a slice of structs without reflection.
-type FielderSlice interface {
-	Len() int
-	At(i int) fmt.Fielder
-	Append() fmt.Fielder
-}
-
 // Encode serializes a Fielder to JSON.
 // output: *[]byte | *string | io.Writer.
 func Encode(data fmt.Fielder, output any) error {
@@ -157,7 +149,7 @@ func encodeFromPtr(b *fmt.Conv, ptr any, ft fmt.FieldType) {
 			b.WriteString("null")
 		}
 	case fmt.FieldStructSlice:
-		if p, ok := ptr.(FielderSlice); ok {
+		if p, ok := ptr.(fmt.FielderSlice); ok {
 			b.WriteByte('[')
 			for i := 0; i < p.Len(); i++ {
 				if i > 0 {
