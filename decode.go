@@ -34,5 +34,8 @@ func Decode(input any, data fmt.Fielder) error {
 	}
 
 	p := parser{data: raw}
+	if slice, ok := data.(fmt.FielderSlice); ok {
+		return p.parseArray(slice)
+	}
 	return p.parseIntoFielder(data)
 }
