@@ -159,6 +159,17 @@ func TestEncode_RootSlice(t *testing.T) {
 	}
 }
 
+func TestEncode_RootSlice_Empty(t *testing.T) {
+	slice := &mockFielderSlice{}
+	var out string
+	if err := json.Encode(slice, &out); err != nil {
+		t.Fatal(err)
+	}
+	if out != "[]" {
+		t.Errorf("got %s, want []", out)
+	}
+}
+
 func TestDecode_RootSlice(t *testing.T) {
 	slice := &mockFielderSlice{}
 	if err := json.Decode(`[{"id":1,"name":"Alice"}]`, slice); err != nil {
@@ -166,5 +177,22 @@ func TestDecode_RootSlice(t *testing.T) {
 	}
 	if slice.Len() != 1 || slice.items[0].(*item).Name != "Alice" {
 		t.Error("decode mismatch")
+	}
+}
+
+func TestDecode_RootSlice_Empty(t *testing.T) {
+	slice := &mockFielderSlice{}
+	if err := json.Decode(`[]`, slice); err != nil {
+		t.Fatal(err)
+	}
+	if slice.Len() != 0 {
+		t.Errorf("expected empty slice, got %d items", slice.Len())
+	}
+}
+
+func TestDecode_RootSlice_InvalidInput(t *testing.T) {
+	slice := &mockFielderSlice{}
+	if err := json.Decode(`{"id":1}`, slice); err == nil {
+		t.Fatal("expected error for object input, got nil")
 	}
 }

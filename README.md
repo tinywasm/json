@@ -77,17 +77,17 @@ func main() {
 
 ### `Encode(data fmt.Fielder, output any) error`
 
-Serializes a `Fielder` to JSON. JSON keys are always taken from `field.Name`. If `field.OmitEmpty` is true, the field is skipped if its value is zero.
+Serializes to JSON. If `data` also implements `fmt.FielderSlice`, it is encoded as a JSON array `[...]`; otherwise as an object `{...}`. JSON keys are taken from `field.Name`. If `field.OmitEmpty` is true, the field is skipped when its value is zero.
 
-- **data**: Must implement `fmt.Fielder`.
+- **data**: `fmt.Fielder` → `{...}` · `fmt.FielderSlice` → `[...]`
 - **output**: `*[]byte`, `*string`, or `io.Writer`.
 
 ### `Decode(input any, data fmt.Fielder) error`
 
-Parses JSON into a Fielder.
+Parses JSON into `data`. If `data` also implements `fmt.FielderSlice`, input must be a JSON array `[...]`; otherwise input must be an object `{...}`.
 
 - **input**: `[]byte`, `string`, or `io.Reader`.
-- **data**: Must implement `fmt.Fielder`.
+- **data**: `fmt.Fielder` → expects `{...}` · `fmt.FielderSlice` → expects `[...]`
 
 ## Supported Types and Limitations
 
@@ -109,7 +109,7 @@ The encoder and decoder directly support the following `fmt.FieldType` mappings:
 
 ### Limitations
 - **No Reflection**: Generic types like `map[string]any`, `[]any`, or arbitrary structs NOT implementing `fmt.Fielder` are NOT supported.
-- **Root Object Only**: Both `Encode` and `Decode` expect a `fmt.Fielder` as the root element. You cannot directly encode/decode a bare string or number as a standalone JSON value.
+- **Root Object or Array**: `Encode`/`Decode` accept `fmt.Fielder` (→ `{}`) or `fmt.FielderSlice` (→ `[]`) at the root. Bare strings, numbers, or `null` as root values are not supported.
 - **No Maps**: Key-value pairs are only supported via struct fields described in the `Schema()`.
 - **Simplified Arrays**: Supported slice types include `[]int` and collections of objects (via `FieldStructSlice`). Other types like `[]string` or `[]float64` are not yet supported.
 - **No Custom Marshaling**: Standard interfaces like `json.Marshaler` or `json.Unmarshaler` are ignored.
