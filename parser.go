@@ -153,6 +153,35 @@ func (p *parser) skipArray() error {
 	}
 }
 
+func (p *parser) parseArray(fs fmt.FielderSlice) error {
+	p.skipWhitespace()
+	if p.peek() != '[' {
+		return fmt.Err("json", "decode", "expected array")
+	}
+	p.next()
+	p.skipWhitespace()
+	if p.peek() == ']' {
+		p.next()
+		return nil
+	}
+	for {
+		nested := fs.Append()
+		if err := p.parseIntoFielder(nested); err != nil {
+			return err
+		}
+		p.skipWhitespace()
+		c := p.next()
+		if c == ']' {
+			break
+		}
+		if c != ',' {
+			return fmt.Err("json", "decode", "expected , or ]")
+		}
+		p.skipWhitespace()
+	}
+	return nil
+}
+
 // skipNumber consumes a JSON number without returning any value.
 func (p *parser) skipNumber() error {
 	for p.pos < len(p.data) {

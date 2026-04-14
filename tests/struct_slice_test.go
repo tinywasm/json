@@ -18,6 +18,9 @@ func (s *mockFielderSlice) Append() fmt.Fielder {
 	return it
 }
 
+func (s *mockFielderSlice) Schema() []fmt.Field { return nil }
+func (s *mockFielderSlice) Pointers() []any     { return nil }
+
 type item struct {
 	ID   int
 	Name string
@@ -138,5 +141,58 @@ func TestDecodeFieldStructSlice(t *testing.T) {
 	it2 := slice.items[1].(*item)
 	if it2.ID != 102 || it2.Name != "Bob" {
 		t.Errorf("item 2 mismatch: %+v", it2)
+	}
+}
+
+func TestEncode_RootSlice(t *testing.T) {
+	slice := &mockFielderSlice{items: []fmt.Fielder{
+		&item{ID: 1, Name: "Alice"},
+		&item{ID: 2, Name: "Bob"},
+	}}
+	var out string
+	if err := json.Encode(slice, &out); err != nil {
+		t.Fatal(err)
+	}
+	want := `[{"id":1,"name":"Alice"},{"id":2,"name":"Bob"}]`
+	if out != want {
+		t.Errorf("got %s", out)
+	}
+}
+
+func TestEncode_RootSlice_Empty(t *testing.T) {
+	slice := &mockFielderSlice{}
+	var out string
+	if err := json.Encode(slice, &out); err != nil {
+		t.Fatal(err)
+	}
+	if out != "[]" {
+		t.Errorf("got %s, want []", out)
+	}
+}
+
+func TestDecode_RootSlice(t *testing.T) {
+	slice := &mockFielderSlice{}
+	if err := json.Decode(`[{"id":1,"name":"Alice"}]`, slice); err != nil {
+		t.Fatal(err)
+	}
+	if slice.Len() != 1 || slice.items[0].(*item).Name != "Alice" {
+		t.Error("decode mismatch")
+	}
+}
+
+func TestDecode_RootSlice_Empty(t *testing.T) {
+	slice := &mockFielderSlice{}
+	if err := json.Decode(`[]`, slice); err != nil {
+		t.Fatal(err)
+	}
+	if slice.Len() != 0 {
+		t.Errorf("expected empty slice, got %d items", slice.Len())
+	}
+}
+
+func TestDecode_RootSlice_InvalidInput(t *testing.T) {
+	slice := &mockFielderSlice{}
+	if err := json.Decode(`{"id":1}`, slice); err == nil {
+		t.Fatal("expected error for object input, got nil")
 	}
 }

@@ -11,8 +11,12 @@ func Encode(data fmt.Fielder, output any) error {
 	b := fmt.GetConv()
 	defer b.PutConv()
 
-	if err := encodeFielder(b, data); err != nil {
-		return err
+	if slice, ok := data.(fmt.FielderSlice); ok {
+		encodeSlice(b, slice)
+	} else {
+		if err := encodeFielder(b, data); err != nil {
+			return err
+		}
 	}
 
 	if b.GetString(fmt.BuffErr) != "" {
@@ -34,6 +38,19 @@ func Encode(data fmt.Fielder, output any) error {
 		return fmt.Err("json", "encode", "output must be *[]byte, *string, or io.Writer")
 	}
 	return nil
+}
+
+func encodeSlice(b *fmt.Conv, s fmt.FielderSlice) {
+	b.WriteByte('[')
+	for i := 0; i < s.Len(); i++ {
+		if i > 0 {
+			b.WriteByte(',')
+		}
+		if err := encodeFielder(b, s.At(i)); err != nil {
+			b.WrString(fmt.BuffErr, err.Error())
+		}
+	}
+	b.WriteByte(']')
 }
 
 func encodeFielder(b *fmt.Conv, f fmt.Fielder) error {
