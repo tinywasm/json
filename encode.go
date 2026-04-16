@@ -180,6 +180,12 @@ func encodeFromPtr(b *fmt.Conv, ptr any, ft fmt.FieldType) {
 		} else {
 			b.WriteString("null")
 		}
+	case fmt.FieldRaw:
+		if p, ok := ptr.(*string); ok && *p != "" {
+			b.WriteString(*p)
+		} else {
+			b.WriteString("null")
+		}
 	default:
 		b.WriteString("null")
 	}
@@ -188,7 +194,7 @@ func encodeFromPtr(b *fmt.Conv, ptr any, ft fmt.FieldType) {
 // isZeroPtr checks if a field value is zero by reading through its pointer.
 func isZeroPtr(ptr any, ft fmt.FieldType) bool {
 	switch ft {
-	case fmt.FieldText:
+	case fmt.FieldText, fmt.FieldRaw:
 		if p, ok := ptr.(*string); ok {
 			return *p == ""
 		}

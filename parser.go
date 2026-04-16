@@ -70,6 +70,15 @@ func (p *parser) skipString() error {
 	return fmt.Err("json", "decode", "unexpected EOF")
 }
 
+// captureValue captures the raw bytes of the next JSON value.
+func (p *parser) captureValue() ([]byte, error) {
+	start := p.pos
+	if err := p.skipValue(); err != nil {
+		return nil, err
+	}
+	return p.data[start:p.pos], nil
+}
+
 // skipValue consumes a JSON value without allocating or returning it.
 // Used to discard unknown fields and unresolvable struct pointers.
 func (p *parser) skipValue() error {
@@ -371,6 +380,17 @@ func (p *parser) parseNull() error {
 func (p *parser) parseIntoPtr(ptr any, ft fmt.FieldType) error {
 	p.skipWhitespace()
 
+	if ft == fmt.FieldRaw {
+		raw, err := p.captureValue()
+		if err != nil {
+			return err
+		}
+		if sp, ok := ptr.(*string); ok {
+			*sp = string(raw)
+		}
+		return nil
+	}
+
 	// Handle JSON null for any type
 	if p.peek() == 'n' {
 		return p.parseNull()
@@ -415,6 +435,7 @@ func (p *parser) parseIntoPtr(ptr any, ft fmt.FieldType) error {
 			*bp = []byte(s)
 		}
 		return nil
+
 	case fmt.FieldIntSlice:
 		if p.peek() != '[' {
 			return fmt.Err("json", "decode", "expected array for int slice")

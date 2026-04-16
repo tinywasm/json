@@ -38,6 +38,37 @@ func TestDecodeInt(t *testing.T) {
 	}
 }
 
+func TestDecodeFieldRaw(t *testing.T) {
+	cases := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{"object", `{"v":{"a":1}}`, `{"a":1}`},
+		{"array", `{"v":[1,2,3]}`, `[1,2,3]`},
+		{"string", `{"v":"hello"}`, `"hello"`},
+		{"null", `{"v":null}`, `null`},
+		{"number", `{"v":123.45}`, `123.45`},
+		{"bool", `{"v":true}`, `true`},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			var raw string
+			m := &mockFielder{
+				schema:   []fmt.Field{{Name: "v", Type: fmt.FieldRaw}},
+				pointers: []any{&raw},
+			}
+			if err := json.Decode(c.input, m); err != nil {
+				t.Fatal(err)
+			}
+			if raw != c.expected {
+				t.Errorf("expected %s, got %s", c.expected, raw)
+			}
+		})
+	}
+}
+
 // TestDecodeInt32      — writeValue with *int32
 func TestDecodeInt32(t *testing.T) {
 	var v int32

@@ -38,3 +38,46 @@ func TestEncodeNumericTypes(t *testing.T) {
         })
     }
 }
+
+func TestEncodeFieldRaw(t *testing.T) {
+	cases := []struct {
+		name     string
+		ptr      any
+		ft       fmt.FieldType
+		expected string
+	}{
+		{"raw object", ptrString(`{"a":1}`), fmt.FieldRaw, `{"v":{"a":1}}`},
+		{"raw array", ptrString(`[1,2,3]`), fmt.FieldRaw, `{"v":[1,2,3]}`},
+		{"raw empty", ptrString(""), fmt.FieldRaw, `{"v":null}`},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			m := &mockFielder{
+				schema:   []fmt.Field{{Name: "v", Type: c.ft}},
+				pointers: []any{c.ptr},
+			}
+			var out string
+			if err := json.Encode(m, &out); err != nil {
+				t.Fatal(err)
+			}
+			if out != c.expected {
+				t.Errorf("expected %s, got %s", c.expected, out)
+			}
+		})
+	}
+}
+
+func TestEncodeRawOmitEmpty(t *testing.T) {
+	var raw string
+	m := &mockFielder{
+		schema:   []fmt.Field{{Name: "v", Type: fmt.FieldRaw, OmitEmpty: true}},
+		pointers: []any{&raw},
+	}
+	var out string
+	if err := json.Encode(m, &out); err != nil {
+		t.Fatal(err)
+	}
+	if out != `{}` {
+		t.Errorf("expected {}, got %s", out)
+	}
+}
