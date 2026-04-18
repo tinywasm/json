@@ -89,6 +89,35 @@ Parses JSON into `data`. If `data` also implements `fmt.FielderSlice`, input mus
 - **input**: `[]byte`, `string`, or `io.Reader`.
 - **data**: `fmt.Fielder` → expects `{...}` · `fmt.FielderSlice` → expects `[...]`
 
+## Pre-Serialized JSON with `fmt.RawJSON`
+
+For fields containing pre-serialized JSON (e.g., API responses that nest raw JSON), use `fmt.RawJSON`:
+
+```go
+// ormc:formonly
+type APIResponse struct {
+    Status string     // regular string
+    Data   fmt.RawJSON // pre-serialized JSON — emitted inline, not quoted
+}
+
+func main() {
+    resp := APIResponse{
+        Status: "ok",
+        Data:   `{"id":123,"name":"Alice"}`, // already JSON-formatted string
+    }
+
+    var out string
+    json.Encode(&resp, &out)
+    // out: {"status":"ok","data":{"id":123,"name":"Alice"}}
+    //                        ↑ no quotes around data — emitted inline
+}
+```
+
+**Why `fmt.RawJSON`?**
+- Eliminates linter warnings about non-standard `json` tag options
+- Self-documenting: the type signals that the field contains pre-serialized JSON
+- Zero overhead: type alias with `=`, no runtime boxing
+
 ## Supported Types and Limitations
 
 To maintain a minimal footprint and zero reflection, `tinywasm/json` has specific support and constraints:
@@ -103,6 +132,7 @@ The encoder and decoder directly support the following `fmt.FieldType` mappings:
 | `float64`, `float32` | `FieldFloat` | `number` |
 | `bool` | `FieldBool` | `boolean` |
 | `[]byte` | `FieldBlob` | `string` (escaped) |
+| `fmt.RawJSON` | `FieldRaw` | `string` (pre-serialized JSON, emitted inline) |
 | `[]int` | `FieldIntSlice` | `array` of `numbers` |
 | `Fielder` | `FieldStruct` | `object` (nested) |
 | `[]Fielder` | `FieldStructSlice` | `array` of `objects` |
