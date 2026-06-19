@@ -6,9 +6,13 @@ import (
 	"unsafe"
 )
 
-// Decode parses JSON into a Fielder.
+// Decode parses JSON into a Decodable.
 // input: []byte | string | io.Reader.
-func Decode(input any, data fmt.Fielder) error {
+func Decode(input any, data fmt.Decodable) error {
+	if data == nil || data.IsNil() {
+		return fmt.Err("json", "decode", "destination is nil")
+	}
+
 	var raw []byte
 	switch in := input.(type) {
 	case []byte:
@@ -34,8 +38,43 @@ func Decode(input any, data fmt.Fielder) error {
 	}
 
 	p := parser{data: raw}
-	if slice, ok := data.(fmt.FielderSlice); ok {
-		return p.parseArray(slice)
+	p.skipWhitespace()
+
+	r := readerPool.Get().(*jsonReader)
+	r.p = &p
+	r.err = nil
+	defer readerPool.Put(r)
+
+	var slice fmt.FielderSlice
+	if s, ok := data.(interface{ FielderSlice() fmt.FielderSlice }); ok {
+		slice = s.FielderSlice()
+	} else if s, ok := data.(fmt.FielderSlice); ok {
+		slice = s
 	}
-	return p.parseIntoFielder(data)
+
+	if slice != nil {
+		// Special case for root level arrays of Fielders
+		if p.peek() != '[' {
+			return fmt.Err("json", "decode", "expected array, got "+string(p.peek()))
+		}
+		arrayStart := p.pos
+		ar := jsonArrayReader{p: &p, start: arrayStart}
+		for i := 0; i < ar.Len(); i++ {
+			it := slice.Append()
+			if dec, ok := it.(fmt.Decodable); ok {
+				ar.Object(i, dec)
+			}
+		}
+		return nil
+	}
+
+	if p.peek() != '{' {
+		return fmt.Err("json", "decode", "expected object, got "+string(p.peek()))
+	}
+	start := p.pos
+	r.start = start
+	if err := data.DecodeFields(r); err != nil {
+		return err
+	}
+	return r.err
 }

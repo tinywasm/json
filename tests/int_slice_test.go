@@ -12,15 +12,31 @@ type FontDef struct {
 	Cw   []int
 }
 
-func (f *FontDef) Schema() []fmt.Field {
-	return []fmt.Field{
-		{Name: "Name", Type: fmt.FieldText},
-		{Name: "Cw", Type: fmt.FieldIntSlice},
+func (f *FontDef) IsNil() bool { return f == nil }
+func (f *FontDef) EncodeFields(w fmt.FieldWriter) {
+	w.String("Name", f.Name)
+	if f.Cw != nil {
+		aw := w.Array("Cw", len(f.Cw))
+		for _, v := range f.Cw {
+			aw.Int(int64(v))
+		}
+		if closer, ok := aw.(interface{ Close() }); ok {
+			closer.Close()
+		}
+	} else {
+		w.Null("Cw")
 	}
 }
-
-func (f *FontDef) Pointers() []any {
-	return []any{&f.Name, &f.Cw}
+func (f *FontDef) DecodeFields(r fmt.FieldReader) error {
+	f.Name, _ = r.String("Name")
+	if ar, ok := r.Array("Cw"); ok {
+		n := ar.Len()
+		f.Cw = make([]int, n)
+		for i := 0; i < n; i++ {
+			f.Cw[i] = int(ar.Int(i))
+		}
+	}
+	return nil
 }
 
 func TestDecodeIntSlice(t *testing.T) {

@@ -1,22 +1,231 @@
 package json
 
 import (
-	"github.com/tinywasm/fmt"
 	"io"
+
+	"github.com/tinywasm/fmt"
 )
 
-// Encode serializes a Fielder to JSON.
+type jsonWriter struct {
+	b     *fmt.Conv
+	first bool
+}
+
+func (w *jsonWriter) maybeComma() {
+	if !w.first {
+		w.b.WriteByte(',')
+	}
+	w.first = false
+}
+
+func (w *jsonWriter) writeKey(name string) {
+	if name != "" {
+		w.b.WriteByte('"')
+		fmt.JSONEscape(name, w.b)
+		w.b.WriteByte('"')
+		w.b.WriteByte(':')
+	}
+}
+
+func (w *jsonWriter) String(name, val string) {
+	w.maybeComma()
+	w.writeKey(name)
+	w.b.WriteByte('"')
+	fmt.JSONEscape(val, w.b)
+	w.b.WriteByte('"')
+}
+
+func (w *jsonWriter) Int(name string, val int64) {
+	w.maybeComma()
+	w.writeKey(name)
+	w.b.WriteInt(val)
+}
+
+func (w *jsonWriter) Uint(name string, val uint64) {
+	w.maybeComma()
+	w.writeKey(name)
+	w.b.WriteString(fmt.Convert(val).String())
+}
+
+func (w *jsonWriter) Float(name string, val float64) {
+	w.maybeComma()
+	w.writeKey(name)
+	w.b.WriteFloat(val)
+}
+
+func (w *jsonWriter) Bool(name string, val bool) {
+	w.maybeComma()
+	w.writeKey(name)
+	if val {
+		w.b.WriteString("true")
+	} else {
+		w.b.WriteString("false")
+	}
+}
+
+func (w *jsonWriter) Bytes(name string, val []byte) {
+	w.maybeComma()
+	w.writeKey(name)
+	w.b.WriteByte('"')
+	fmt.JSONEscape(string(val), w.b)
+	w.b.WriteByte('"')
+}
+
+func (w *jsonWriter) Null(name string) {
+	w.maybeComma()
+	w.writeKey(name)
+	w.b.WriteString("null")
+}
+
+func (w *jsonWriter) Object(name string, val fmt.Encodable) {
+	w.maybeComma()
+	w.writeKey(name)
+	if val == nil || val.IsNil() {
+		w.b.WriteString("null")
+		return
+	}
+	if r, ok := val.(interface{ Raw() string }); ok {
+		w.b.WriteString(r.Raw())
+		return
+	}
+
+	w.b.WriteByte('{')
+	iw := getWriter()
+	iw.b = w.b
+	iw.first = true
+	val.EncodeFields(iw)
+	w.b.WriteByte('}')
+	putWriter(iw)
+}
+
+func (w *jsonWriter) Array(name string, n int) fmt.ArrayWriter {
+	w.maybeComma()
+	w.writeKey(name)
+	w.b.WriteByte('[')
+	aw := getArrayWriter()
+	aw.b = w.b
+	aw.first = true
+	return aw
+}
+
+type jsonArrayWriter struct {
+	b     *fmt.Conv
+	first bool
+}
+
+func (w *jsonArrayWriter) maybeComma() {
+	if !w.first {
+		w.b.WriteByte(',')
+	}
+	w.first = false
+}
+
+func (w *jsonArrayWriter) String(val string) {
+	w.maybeComma()
+	w.b.WriteByte('"')
+	fmt.JSONEscape(val, w.b)
+	w.b.WriteByte('"')
+}
+
+func (w *jsonArrayWriter) Int(val int64) {
+	w.maybeComma()
+	w.b.WriteInt(val)
+}
+
+func (w *jsonArrayWriter) Float(val float64) {
+	w.maybeComma()
+	w.b.WriteFloat(val)
+}
+
+func (w *jsonArrayWriter) Bool(val bool) {
+	w.maybeComma()
+	if val {
+		w.b.WriteString("true")
+	} else {
+		w.b.WriteString("false")
+	}
+}
+
+func (w *jsonArrayWriter) Bytes(val []byte) {
+	w.maybeComma()
+	w.b.WriteByte('"')
+	fmt.JSONEscape(string(val), w.b)
+	w.b.WriteByte('"')
+}
+
+func (w *jsonArrayWriter) Object(val fmt.Encodable) {
+	w.maybeComma()
+	if val == nil || val.IsNil() {
+		w.b.WriteString("null")
+		return
+	}
+	if r, ok := val.(interface{ Raw() string }); ok {
+		w.b.WriteString(r.Raw())
+		return
+	}
+	w.b.WriteByte('{')
+	iw := getWriter()
+	iw.b = w.b
+	iw.first = true
+	val.EncodeFields(iw)
+	w.b.WriteByte('}')
+	putWriter(iw)
+}
+
+func (w *jsonArrayWriter) Close() {
+	w.b.WriteByte(']')
+	putArrayWriter(w)
+}
+
+// Encode serializes an Encodable to JSON.
 // output: *[]byte | *string | io.Writer.
-func Encode(data fmt.Fielder, output any) error {
+func Encode(data fmt.Encodable, output any) error {
 	b := fmt.GetConv()
 	defer b.PutConv()
 
-	if slice, ok := data.(fmt.FielderSlice); ok {
-		encodeSlice(b, slice)
+	if data == nil || data.IsNil() {
+		b.WriteString("null")
 	} else {
-		if err := encodeFielder(b, data); err != nil {
-			return err
+		w := getWriter()
+		w.b = b
+		w.first = true
+
+		var slice fmt.FielderSlice
+		if s, ok := data.(interface{ FielderSlice() fmt.FielderSlice }); ok {
+			slice = s.FielderSlice()
+		} else if s, ok := data.(fmt.FielderSlice); ok {
+			slice = s
 		}
+
+		if slice != nil {
+			b.WriteByte('[')
+			for i := 0; i < slice.Len(); i++ {
+				if i > 0 {
+					b.WriteByte(',')
+				}
+				if it, ok := slice.At(i).(fmt.Encodable); ok {
+					iw := getWriter()
+					iw.b = b
+					iw.first = true
+					if it.IsNil() {
+						b.WriteString("null")
+					} else {
+						b.WriteByte('{')
+						it.EncodeFields(iw)
+						b.WriteByte('}')
+					}
+					putWriter(iw)
+				} else {
+					b.WriteString("null")
+				}
+			}
+			b.WriteByte(']')
+		} else {
+			b.WriteByte('{')
+			data.EncodeFields(w)
+			b.WriteByte('}')
+		}
+		putWriter(w)
 	}
 
 	if b.GetString(fmt.BuffErr) != "" {
@@ -39,208 +248,3 @@ func Encode(data fmt.Fielder, output any) error {
 	}
 	return nil
 }
-
-func encodeSlice(b *fmt.Conv, s fmt.FielderSlice) {
-	b.WriteByte('[')
-	for i := 0; i < s.Len(); i++ {
-		if i > 0 {
-			b.WriteByte(',')
-		}
-		if err := encodeFielder(b, s.At(i)); err != nil {
-			b.WrString(fmt.BuffErr, err.Error())
-		}
-	}
-	b.WriteByte(']')
-}
-
-func encodeFielder(b *fmt.Conv, f fmt.Fielder) error {
-	schema := f.Schema()
-	ptrs := f.Pointers()
-	if ptrs == nil && schema != nil {
-		return fmt.Err("json", "encode", "failed to get pointers")
-	}
-	b.WriteByte('{')
-
-	first := true
-	for i, field := range schema {
-		if field.OmitEmpty && isZeroPtr(ptrs[i], field.Type) {
-			continue
-		}
-
-		if !first {
-			b.WriteByte(',')
-		}
-		first = false
-
-		b.WriteByte('"')
-		fmt.JSONEscape(field.Name, b)
-		b.WriteByte('"')
-		b.WriteByte(':')
-
-		encodeFromPtr(b, ptrs[i], field.Type)
-	}
-
-	b.WriteByte('}')
-	return nil
-}
-
-// encodeFromPtr writes a JSON value by reading directly from a typed pointer.
-// Avoids interface boxing — the value is never wrapped in any.
-func encodeFromPtr(b *fmt.Conv, ptr any, ft fmt.FieldType) {
-	switch ft {
-	case fmt.FieldText:
-		if p, ok := ptr.(*string); ok {
-			b.WriteByte('"')
-			fmt.JSONEscape(*p, b)
-			b.WriteByte('"')
-		} else {
-			b.WriteString("null")
-		}
-	case fmt.FieldInt:
-		switch p := ptr.(type) {
-		case *int64:
-			b.WriteInt(*p)
-		case *int:
-			b.WriteInt(int64(*p))
-		case *int32:
-			b.WriteInt(int64(*p))
-		case *int8:
-			b.WriteInt(int64(*p))
-		case *int16:
-			b.WriteInt(int64(*p))
-		case *uint:
-			b.WriteInt(int64(*p))
-		case *uint8:
-			b.WriteInt(int64(*p))
-		case *uint16:
-			b.WriteInt(int64(*p))
-		case *uint32:
-			b.WriteInt(int64(*p))
-		case *uint64:
-			b.WriteInt(int64(*p))
-		default:
-			b.WriteByte('0')
-		}
-	case fmt.FieldFloat:
-		switch p := ptr.(type) {
-		case *float64:
-			b.WriteFloat(*p)
-		case *float32:
-			b.WriteFloat(float64(*p))
-		default:
-			b.WriteByte('0')
-		}
-	case fmt.FieldBool:
-		if p, ok := ptr.(*bool); ok && *p {
-			b.WriteString("true")
-		} else {
-			b.WriteString("false")
-		}
-	case fmt.FieldBlob:
-		if p, ok := ptr.(*[]byte); ok {
-			b.WriteByte('"')
-			fmt.JSONEscape(string(*p), b)
-			b.WriteByte('"')
-		} else {
-			b.WriteString("null")
-		}
-	case fmt.FieldStruct:
-		if nested, ok := ptr.(fmt.Fielder); ok {
-			if err := encodeFielder(b, nested); err != nil {
-				b.WrString(fmt.BuffErr, err.Error())
-			}
-		} else {
-			b.WriteString("null")
-		}
-	case fmt.FieldIntSlice:
-		if p, ok := ptr.(*[]int); ok {
-			b.WriteByte('[')
-			for i, v := range *p {
-				if i > 0 {
-					b.WriteByte(',')
-				}
-				b.WriteInt(int64(v))
-			}
-			b.WriteByte(']')
-		} else {
-			b.WriteString("null")
-		}
-	case fmt.FieldStructSlice:
-		if p, ok := ptr.(fmt.FielderSlice); ok {
-			b.WriteByte('[')
-			for i := 0; i < p.Len(); i++ {
-				if i > 0 {
-					b.WriteByte(',')
-				}
-				if err := encodeFielder(b, p.At(i)); err != nil {
-					b.WrString(fmt.BuffErr, err.Error())
-				}
-			}
-			b.WriteByte(']')
-		} else {
-			b.WriteString("null")
-		}
-	case fmt.FieldRaw:
-		if p, ok := ptr.(*string); ok && *p != "" {
-			b.WriteString(*p)
-		} else {
-			b.WriteString("null")
-		}
-	default:
-		b.WriteString("null")
-	}
-}
-
-// isZeroPtr checks if a field value is zero by reading through its pointer.
-func isZeroPtr(ptr any, ft fmt.FieldType) bool {
-	switch ft {
-	case fmt.FieldText, fmt.FieldRaw:
-		if p, ok := ptr.(*string); ok {
-			return *p == ""
-		}
-	case fmt.FieldInt:
-		switch p := ptr.(type) {
-		case *int:
-			return *p == 0
-		case *int8:
-			return *p == 0
-		case *int16:
-			return *p == 0
-		case *int32:
-			return *p == 0
-		case *int64:
-			return *p == 0
-		case *uint:
-			return *p == 0
-		case *uint8:
-			return *p == 0
-		case *uint16:
-			return *p == 0
-		case *uint32:
-			return *p == 0
-		case *uint64:
-			return *p == 0
-		}
-	case fmt.FieldFloat:
-		switch p := ptr.(type) {
-		case *float64:
-			return *p == 0
-		case *float32:
-			return *p == 0
-		}
-	case fmt.FieldBool:
-		if p, ok := ptr.(*bool); ok {
-			return !*p
-		}
-	case fmt.FieldBlob:
-		if p, ok := ptr.(*[]byte); ok {
-			return len(*p) == 0
-		}
-	case fmt.FieldIntSlice:
-		if p, ok := ptr.(*[]int); ok {
-			return len(*p) == 0
-		}
-	}
-	return false
-}
-

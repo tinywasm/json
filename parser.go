@@ -1,12 +1,432 @@
 package json
 
-import (
-	"github.com/tinywasm/fmt"
-)
+import "github.com/tinywasm/fmt"
 
 type parser struct {
 	data []byte
 	pos  int
+}
+
+type jsonReader struct {
+	p     *parser
+	start int // offset of the object '{'
+	err   error
+}
+
+func (r *jsonReader) String(name string) (string, bool) {
+	found, err := r.scanToKey(name)
+	if err != nil {
+		r.err = err
+		return "", false
+	}
+	if !found {
+		return "", false
+	}
+	r.p.skipWhitespace()
+	if r.p.peek() != ':' {
+		return "", false
+	}
+	r.p.next() // consume ':'
+	r.p.skipWhitespace()
+	if r.p.peek() != '"' {
+		return "", false
+	}
+	r.p.next() // consume '"'
+	val, err := r.p.parseString()
+	if err != nil {
+		r.err = err
+		return "", false
+	}
+	return val, true
+}
+
+func (r *jsonReader) Int(name string) (int64, bool) {
+	found, err := r.scanToKey(name)
+	if err != nil {
+		r.err = err
+		return 0, false
+	}
+	if !found {
+		return 0, false
+	}
+	r.p.skipWhitespace()
+	if r.p.peek() != ':' {
+		return 0, false
+	}
+	r.p.next()
+	r.p.skipWhitespace()
+	start := r.p.pos
+	if err := r.p.skipNumber(); err != nil {
+		r.err = err
+		return 0, false
+	}
+	c := fmt.GetConv()
+	defer c.PutConv()
+	c.LoadBytes(r.p.data[start:r.p.pos])
+	val, err := c.Int64()
+	if err != nil {
+		r.err = err
+		return 0, false
+	}
+	return val, true
+}
+
+func (r *jsonReader) Uint(name string) (uint64, bool) {
+	found, err := r.scanToKey(name)
+	if err != nil {
+		r.err = err
+		return 0, false
+	}
+	if !found {
+		return 0, false
+	}
+	r.p.skipWhitespace()
+	if r.p.next() != ':' {
+		return 0, false
+	}
+	r.p.skipWhitespace()
+	start := r.p.pos
+	if err := r.p.skipNumber(); err != nil {
+		r.err = err
+		return 0, false
+	}
+	c := fmt.GetConv()
+	defer c.PutConv()
+	c.LoadBytes(r.p.data[start:r.p.pos])
+	val, err := c.Uint64()
+	if err != nil {
+		r.err = err
+		return 0, false
+	}
+	return val, true
+}
+
+func (r *jsonReader) Float(name string) (float64, bool) {
+	found, err := r.scanToKey(name)
+	if err != nil {
+		r.err = err
+		return 0, false
+	}
+	if !found {
+		return 0, false
+	}
+	r.p.skipWhitespace()
+	if r.p.next() != ':' {
+		return 0, false
+	}
+	r.p.skipWhitespace()
+	start := r.p.pos
+	if err := r.p.skipNumber(); err != nil {
+		r.err = err
+		return 0, false
+	}
+	c := fmt.GetConv()
+	defer c.PutConv()
+	c.LoadBytes(r.p.data[start:r.p.pos])
+	val, err := c.Float64()
+	if err != nil {
+		r.err = err
+		return 0, false
+	}
+	return val, true
+}
+
+func (r *jsonReader) Bool(name string) (bool, bool) {
+	found, err := r.scanToKey(name)
+	if err != nil {
+		r.err = err
+		return false, false
+	}
+	if !found {
+		return false, false
+	}
+	r.p.skipWhitespace()
+	if r.p.peek() != ':' {
+		return false, false
+	}
+	r.p.next()
+	r.p.skipWhitespace()
+	val, err := r.p.parseBool()
+	if err != nil {
+		r.err = err
+		return false, false
+	}
+	return val, true
+}
+
+func (r *jsonReader) Bytes(name string) ([]byte, bool) {
+	s, ok := r.String(name)
+	if !ok {
+		return nil, false
+	}
+	return []byte(s), true
+}
+
+func (r *jsonReader) Raw(name string) (string, bool) {
+	found, err := r.scanToKey(name)
+	if err != nil {
+		r.err = err
+		return "", false
+	}
+	if !found {
+		return "", false
+	}
+	r.p.skipWhitespace()
+	if r.p.peek() != ':' {
+		return "", false
+	}
+	r.p.next() // consume ':'
+	r.p.skipWhitespace()
+	start := r.p.pos
+	if err := r.p.skipValue(); err != nil {
+		r.err = err
+		return "", false
+	}
+	return string(r.p.data[start:r.p.pos]), true
+}
+
+func (r *jsonReader) Object(name string, into fmt.Decodable) bool {
+	found, err := r.scanToKey(name)
+	if err != nil {
+		r.err = err
+		return false
+	}
+	if !found {
+		return false
+	}
+	r.p.skipWhitespace()
+	if r.p.peek() != ':' {
+		return false
+	}
+	r.p.next() // consume ':'
+	r.p.skipWhitespace()
+	if r.p.peek() == 'n' {
+		r.p.parseNull()
+		return true
+	}
+	if r.p.peek() != '{' {
+		return false
+	}
+	objStart := r.p.pos
+	innerReader := getReader()
+	innerReader.p = r.p
+	innerReader.start = objStart
+	innerReader.err = nil
+	err = into.DecodeFields(innerReader)
+	if err != nil {
+		r.err = err
+		putReader(innerReader)
+		return false
+	}
+	if innerReader.err != nil {
+		r.err = innerReader.err
+		putReader(innerReader)
+		return false
+	}
+	putReader(innerReader)
+	r.p.pos = objStart
+	r.p.skipObject()
+	return true
+}
+
+func (r *jsonReader) Array(name string) (fmt.ArrayReader, bool) {
+	found, err := r.scanToKey(name)
+	if err != nil {
+		r.err = err
+		return nil, false
+	}
+	if !found {
+		return nil, false
+	}
+	r.p.skipWhitespace()
+	if r.p.peek() != ':' {
+		return nil, false
+	}
+	r.p.next() // consume ':'
+	r.p.skipWhitespace()
+	if r.p.peek() != '[' {
+		return nil, false
+	}
+	arrayStart := r.p.pos
+	return &jsonArrayReader{p: r.p, start: arrayStart}, true
+}
+
+func (r *jsonReader) scanToKey(name string) (bool, error) {
+	r.p.pos = r.start
+	r.p.skipWhitespace()
+	if r.p.peek() != '{' {
+		return false, fmt.Err("json", "decode", "expected { at "+string(r.p.peek()))
+	}
+	r.p.next()
+	for {
+		r.p.skipWhitespace()
+		if r.p.peek() == '}' {
+			return false, nil
+		}
+		if r.p.next() != '"' {
+			return false, fmt.Err("json", "decode", "expected quote")
+		}
+		keyStart := r.p.pos
+		if err := r.p.skipString(); err != nil {
+			return false, err
+		}
+		keyBytes := r.p.data[keyStart : r.p.pos-1]
+		r.p.skipWhitespace()
+		if r.p.peek() != ':' {
+			return false, fmt.Err("json", "decode", "expected :")
+		}
+		if equalStringBytes(name, keyBytes) {
+			return true, nil
+		}
+		r.p.next() // consume ':'
+		if err := r.p.skipValue(); err != nil {
+			return false, err
+		}
+		r.p.skipWhitespace()
+		c := r.p.peek()
+		if c == '}' {
+			continue // will be caught by loop start
+		}
+		if c == ',' {
+			r.p.next()
+			continue
+		}
+		return false, fmt.Err("json", "decode", "expected , or }")
+	}
+}
+
+type jsonArrayReader struct {
+	p     *parser
+	start int // offset of '['
+}
+
+func (r *jsonArrayReader) Len() int {
+	r.p.pos = r.start
+	r.p.skipWhitespace()
+	if r.p.next() != '[' {
+		return 0
+	}
+	r.p.skipWhitespace()
+	if r.p.peek() == ']' {
+		return 0
+	}
+	count := 0
+	for {
+		if err := r.p.skipValue(); err != nil {
+			return count
+		}
+		count++
+		r.p.skipWhitespace()
+		c := r.p.next()
+		if c == ']' {
+			return count
+		}
+		if c != ',' {
+			return count
+		}
+	}
+}
+
+func (r jsonArrayReader) seekToIndex(i int) bool {
+	r.p.pos = r.start
+	r.p.skipWhitespace()
+	if r.p.peek() != '[' {
+		return false
+	}
+	r.p.next() // consume '['
+	for j := 0; j <= i; j++ {
+		r.p.skipWhitespace()
+		if r.p.peek() == ']' {
+			return false
+		}
+		if j == i {
+			return true
+		}
+		if err := r.p.skipValue(); err != nil {
+			return false
+		}
+		r.p.skipWhitespace()
+		if r.p.next() != ',' {
+			return false
+		}
+	}
+	return false
+}
+
+func (r jsonArrayReader) String(i int) string {
+	if !r.seekToIndex(i) {
+		return ""
+	}
+	r.p.skipWhitespace()
+	if r.p.next() != '"' {
+		return ""
+	}
+	val, _ := r.p.parseString()
+	return val
+}
+
+func (r jsonArrayReader) Int(i int) int64 {
+	if !r.seekToIndex(i) {
+		return 0
+	}
+	r.p.skipWhitespace()
+	start := r.p.pos
+	if err := r.p.skipNumber(); err != nil {
+		return 0
+	}
+	c := fmt.GetConv()
+	defer c.PutConv()
+	c.LoadBytes(r.p.data[start:r.p.pos])
+	val, _ := c.Int64()
+	return val
+}
+
+func (r jsonArrayReader) Float(i int) float64 {
+	if !r.seekToIndex(i) {
+		return 0
+	}
+	r.p.skipWhitespace()
+	start := r.p.pos
+	if err := r.p.skipNumber(); err != nil {
+		return 0
+	}
+	c := fmt.GetConv()
+	defer c.PutConv()
+	c.LoadBytes(r.p.data[start:r.p.pos])
+	val, _ := c.Float64()
+	return val
+}
+
+func (r jsonArrayReader) Bool(i int) bool {
+	if !r.seekToIndex(i) {
+		return false
+	}
+	val, _ := r.p.parseBool()
+	return val
+}
+
+func (r jsonArrayReader) Bytes(i int) []byte {
+	return []byte(r.String(i))
+}
+
+func (r jsonArrayReader) Object(i int, into fmt.Decodable) bool {
+	if !r.seekToIndex(i) {
+		return false
+	}
+	r.p.skipWhitespace()
+	if r.p.peek() != '{' {
+		return false
+	}
+	objStart := r.p.pos
+	innerReader := getReader()
+	innerReader.p = r.p
+	innerReader.start = objStart
+	innerReader.err = nil
+	err := into.DecodeFields(innerReader)
+	r.p.pos = objStart
+	r.p.skipObject()
+	putReader(innerReader)
+	return err == nil
 }
 
 func (p *parser) skipWhitespace() {
@@ -36,8 +456,6 @@ func (p *parser) next() byte {
 	return 0
 }
 
-// skipString consumes a JSON string without allocation.
-// The opening '"' must already be consumed.
 func (p *parser) skipString() error {
 	for p.pos < len(p.data) {
 		c := p.data[p.pos]
@@ -54,7 +472,6 @@ func (p *parser) skipString() error {
 			p.pos++
 			switch esc {
 			case '"', '\\', '/', 'b', 'f', 'n', 'r', 't':
-				// Valid
 			case 'u':
 				if p.pos+4 > len(p.data) {
 					return fmt.Err("json", "decode", "invalid unicode escape")
@@ -70,7 +487,6 @@ func (p *parser) skipString() error {
 	return fmt.Err("json", "decode", "unexpected EOF")
 }
 
-// captureValue captures the raw bytes of the next JSON value.
 func (p *parser) captureValue() ([]byte, error) {
 	start := p.pos
 	if err := p.skipValue(); err != nil {
@@ -79,35 +495,32 @@ func (p *parser) captureValue() ([]byte, error) {
 	return p.data[start:p.pos], nil
 }
 
-// skipValue consumes a JSON value without allocating or returning it.
-// Used to discard unknown fields and unresolvable struct pointers.
 func (p *parser) skipValue() error {
 	p.skipWhitespace()
-	c := p.next()
+	c := p.peek()
 	switch c {
 	case '"':
+		p.next()
 		return p.skipString()
 	case '{':
+		p.next()
 		return p.skipObject()
 	case '[':
+		p.next()
 		return p.skipArray()
 	case 't', 'f':
-		p.pos--
 		_, err := p.parseBool()
 		return err
 	case 'n':
-		p.pos--
 		return p.parseNull()
 	default:
 		if (c >= '0' && c <= '9') || c == '-' {
-			p.pos--
 			return p.skipNumber()
 		}
 		return fmt.Err("json", "decode", "unexpected character")
 	}
 }
 
-// skipObject consumes a JSON object without allocating map or keys.
 func (p *parser) skipObject() error {
 	p.skipWhitespace()
 	if p.peek() == '}' {
@@ -140,7 +553,6 @@ func (p *parser) skipObject() error {
 	}
 }
 
-// skipArray consumes a JSON array without allocating []any.
 func (p *parser) skipArray() error {
 	p.skipWhitespace()
 	if p.peek() == ']' {
@@ -162,37 +574,8 @@ func (p *parser) skipArray() error {
 	}
 }
 
-func (p *parser) parseArray(fs fmt.FielderSlice) error {
-	p.skipWhitespace()
-	if p.peek() != '[' {
-		return fmt.Err("json", "decode", "expected array")
-	}
-	p.next()
-	p.skipWhitespace()
-	if p.peek() == ']' {
-		p.next()
-		return nil
-	}
-	for {
-		nested := fs.Append()
-		if err := p.parseIntoFielder(nested); err != nil {
-			return err
-		}
-		p.skipWhitespace()
-		c := p.next()
-		if c == ']' {
-			break
-		}
-		if c != ',' {
-			return fmt.Err("json", "decode", "expected , or ]")
-		}
-		p.skipWhitespace()
-	}
-	return nil
-}
-
-// skipNumber consumes a JSON number without returning any value.
 func (p *parser) skipNumber() error {
+	p.skipWhitespace()
 	for p.pos < len(p.data) {
 		c := p.data[p.pos]
 		if (c >= '0' && c <= '9') || c == '-' || c == '+' || c == '.' || c == 'e' || c == 'E' {
@@ -204,20 +587,16 @@ func (p *parser) skipNumber() error {
 	return nil
 }
 
-// parseString parses a JSON string. The opening '"' must already be consumed.
-// Fast path: if no escape sequences, returns string(data[start:end]) — 1 alloc.
-// Slow path: uses Conv builder for strings with escapes — 2 allocs.
 func (p *parser) parseString() (string, error) {
 	start := p.pos
 	for p.pos < len(p.data) {
 		c := p.data[p.pos]
 		if c == '"' {
 			s := string(p.data[start:p.pos])
-			p.pos++ // consume closing '"'
+			p.pos++
 			return s, nil
 		}
 		if c == '\\' {
-			// Escape found — fall back to slow path with builder
 			return p.parseStringEscape(start)
 		}
 		p.pos++
@@ -225,17 +604,12 @@ func (p *parser) parseString() (string, error) {
 	return "", fmt.Err("json", "decode", "unexpected EOF")
 }
 
-// parseStringEscape handles strings with escape sequences.
-// Called when parseString encounters '\' at some position.
-// start is the position of the first character after the opening '"'.
 func (p *parser) parseStringEscape(start int) (string, error) {
 	b := fmt.GetConv()
 	defer b.PutConv()
-	// Write the part before the escape that was already scanned
 	for i := start; i < p.pos; i++ {
 		b.WriteByte(p.data[i])
 	}
-	// Continue parsing with escape handling
 	for p.pos < len(p.data) {
 		c := p.data[p.pos]
 		p.pos++
@@ -283,82 +657,14 @@ func (p *parser) parseStringEscape(start int) (string, error) {
 	return "", fmt.Err("json", "decode", "unexpected EOF")
 }
 
-// parseNumberInto parses a JSON number directly into a typed pointer.
-// Uses fmt.GetConv + LoadBytes + Int64/Float64 + PutConv — 0 allocations
-// (reuses fmt's existing parseIntBase/parseFloatBase via pool).
-func (p *parser) parseNumberInto(ptr any, ft fmt.FieldType) error {
-	p.skipWhitespace()
-	start := p.pos
-	isFloat := false
-	for p.pos < len(p.data) {
-		c := p.data[p.pos]
-		if (c >= '0' && c <= '9') || c == '-' || c == '+' {
-			p.pos++
-		} else if c == '.' || c == 'e' || c == 'E' {
-			isFloat = true
-			p.pos++
-		} else {
-			break
-		}
-	}
-	if p.pos == start {
-		return fmt.Err("json", "decode", "expected number")
-	}
-
-	numBytes := p.data[start:p.pos]
-
-	c := fmt.GetConv()
-	c.LoadBytes(numBytes)
-
-	if ft == fmt.FieldFloat || isFloat {
-		v, err := c.Float64()
-		c.PutConv()
-		if err != nil {
-			return err
-		}
-		if ft == fmt.FieldFloat {
-			switch fp := ptr.(type) {
-			case *float64:
-				*fp = v
-			case *float32:
-				*fp = float32(v)
-			}
-		} else {
-			// FieldInt but JSON has decimal/exponent — truncate
-			switch ip := ptr.(type) {
-			case *int64:
-				*ip = int64(v)
-			case *int:
-				*ip = int(v)
-			case *int32:
-				*ip = int32(v)
-			}
-		}
-	} else {
-		v, err := c.Int64()
-		c.PutConv()
-		if err != nil {
-			return err
-		}
-		switch ip := ptr.(type) {
-		case *int64:
-			*ip = v
-		case *int:
-			*ip = int(v)
-		case *int32:
-			*ip = int32(v)
-		}
-	}
-	return nil
-}
-
 func (p *parser) parseBool() (bool, error) {
+	p.skipWhitespace()
 	if p.peek() == 't' {
 		if p.pos+4 <= len(p.data) && string(p.data[p.pos:p.pos+4]) == "true" {
 			p.pos += 4
 			return true, nil
 		}
-	} else {
+	} else if p.peek() == 'f' {
 		if p.pos+5 <= len(p.data) && string(p.data[p.pos:p.pos+5]) == "false" {
 			p.pos += 5
 			return false, nil
@@ -368,288 +674,22 @@ func (p *parser) parseBool() (bool, error) {
 }
 
 func (p *parser) parseNull() error {
-	if p.pos+4 <= len(p.data) && string(p.data[p.pos:p.pos+4]) == "null" {
+	p.skipWhitespace()
+	if p.pos+4 <= len(p.data) && equalStringBytes("null", p.data[p.pos:p.pos+4]) {
 		p.pos += 4
 		return nil
 	}
 	return fmt.Err("json", "decode", "expected null")
 }
 
-// parseIntoPtr parses a JSON value directly into a typed pointer.
-// Bypasses parseValue()/writeValue() to avoid boxing values into any.
-func (p *parser) parseIntoPtr(ptr any, ft fmt.FieldType) error {
-	p.skipWhitespace()
-
-	if ft == fmt.FieldRaw {
-		raw, err := p.captureValue()
-		if err != nil {
-			return err
-		}
-		if sp, ok := ptr.(*string); ok {
-			*sp = string(raw)
-		}
-		return nil
+func equalStringBytes(s string, b []byte) bool {
+	if len(s) != len(b) {
+		return false
 	}
-
-	// Handle JSON null for any type
-	if p.peek() == 'n' {
-		return p.parseNull()
-	}
-
-	switch ft {
-	case fmt.FieldText:
-		if p.next() != '"' {
-			return fmt.Err("json", "decode", "expected string")
-		}
-		s, err := p.parseString()
-		if err != nil {
-			return err
-		}
-		if sp, ok := ptr.(*string); ok {
-			*sp = s
-		}
-		return nil
-
-	case fmt.FieldInt, fmt.FieldFloat:
-		return p.parseNumberInto(ptr, ft)
-
-	case fmt.FieldBool:
-		b, err := p.parseBool()
-		if err != nil {
-			return err
-		}
-		if bp, ok := ptr.(*bool); ok {
-			*bp = b
-		}
-		return nil
-
-	case fmt.FieldBlob:
-		if p.next() != '"' {
-			return fmt.Err("json", "decode", "expected string for blob")
-		}
-		s, err := p.parseString()
-		if err != nil {
-			return err
-		}
-		if bp, ok := ptr.(*[]byte); ok {
-			*bp = []byte(s)
-		}
-		return nil
-
-	case fmt.FieldIntSlice:
-		if p.peek() != '[' {
-			return fmt.Err("json", "decode", "expected array for int slice")
-		}
-		p.next() // consume '['
-		p.skipWhitespace()
-		sp, ok := ptr.(*[]int)
-		if !ok {
-			return p.skipArray()
-		}
-		if p.peek() == ']' {
-			p.next()
-			*sp = []int{}
-			return nil
-		}
-		var result []int
-		for {
-			var v int
-			if err := p.parseNumberInto(&v, fmt.FieldInt); err != nil {
-				return err
-			}
-			result = append(result, v)
-			p.skipWhitespace()
-			c := p.next()
-			if c == ']' {
-				break
-			}
-			if c != ',' {
-				return fmt.Err("json", "decode", "expected , or ]")
-			}
-		}
-		*sp = result
-		return nil
-	case fmt.FieldStructSlice:
-		if p.peek() != '[' {
-			return fmt.Err("json", "decode", "expected array for struct slice")
-		}
-		p.next() // consume '['
-		p.skipWhitespace()
-		fs, ok := ptr.(fmt.FielderSlice)
-		if !ok {
-			return p.skipArray()
-		}
-		if p.peek() == ']' {
-			p.next()
-			return nil
-		}
-		for {
-			nested := fs.Append()
-			if err := p.parseIntoFielder(nested); err != nil {
-				return err
-			}
-			p.skipWhitespace()
-			c := p.next()
-			if c == ']' {
-				break
-			}
-			if c != ',' {
-				return fmt.Err("json", "decode", "expected , or ]")
-			}
-			p.skipWhitespace()
-		}
-		return nil
-	}
-
-	// Fallback for unknown field types
-	return p.skipValue()
-}
-
-// matchFieldIndex matches the current JSON key (bytes between pos and closing '"')
-// against schema field names WITHOUT allocating a string.
-// Returns field index or -1 if not found. Advances pos past the closing '"'.
-// Falls back to parseString if escape sequences are found.
-func (p *parser) matchFieldIndex(schema []fmt.Field) (int, error) {
-	start := p.pos
-	for p.pos < len(p.data) {
-		c := p.data[p.pos]
-		if c == '"' {
-			keyBytes := p.data[start:p.pos]
-			p.pos++ // consume closing '"'
-			for i, field := range schema {
-				if len(field.Name) == len(keyBytes) && matchBytesStr(field.Name, keyBytes) {
-					return i, nil
-				}
-			}
-			return -1, nil // unknown field
-		}
-		if c == '\\' {
-			// Rare: escaped key — fall back to allocating path
-			key, err := p.parseStringEscape(start)
-			if err != nil {
-				return -1, err
-			}
-			for i, field := range schema {
-				if field.Name == key {
-					return i, nil
-				}
-			}
-			return -1, nil
-		}
-		p.pos++
-	}
-	return -1, fmt.Err("json", "decode", "unexpected EOF in key")
-}
-
-// matchBytesStr compares a string against a byte slice without allocation.
-func matchBytesStr(s string, b []byte) bool {
-	for i := 0; i < len(s); i++ {
-		if s[i] != b[i] {
+	for i := range b {
+		if b[i] != s[i] {
 			return false
 		}
 	}
 	return true
 }
-
-// parseIntoFielder parses a JSON object directly into the Fielder.
-// Eliminates the need for map[string]any as an intermediary.
-func (p *parser) parseIntoFielder(f fmt.Fielder) error {
-	p.skipWhitespace()
-	if p.next() != '{' {
-		return fmt.Err("json", "decode", "expected {")
-	}
-
-	schema := f.Schema()
-	pointers := f.Pointers()
-
-	p.skipWhitespace()
-	if p.peek() == '}' {
-		p.next()
-		return nil
-	}
-
-	for {
-		p.skipWhitespace()
-		if p.next() != '"' {
-			return fmt.Err("json", "decode", "expected quote")
-		}
-
-		fieldIdx, err := p.matchFieldIndex(schema)
-		if err != nil {
-			return err
-		}
-
-		p.skipWhitespace()
-		if p.next() != ':' {
-			return fmt.Err("json", "decode", "expected :")
-		}
-
-		if fieldIdx < 0 {
-			// Unknown field: parse and discard
-			if err := p.skipValue(); err != nil {
-				return err
-			}
-		} else {
-			field := schema[fieldIdx]
-			ptr := pointers[fieldIdx]
-
-			if field.Type == fmt.FieldStruct {
-				if nested, ok := ptr.(fmt.Fielder); ok {
-					if err := p.parseIntoFielder(nested); err != nil {
-						return err
-					}
-				} else {
-					if err := p.skipValue(); err != nil {
-						return err
-					}
-				}
-			} else if field.Type == fmt.FieldStructSlice {
-				if nested, ok := ptr.(fmt.FielderSlice); ok {
-					if p.peek() != '[' {
-						return fmt.Err("json", "decode", "expected array for struct slice")
-					}
-					p.next() // consume '['
-					p.skipWhitespace()
-					if p.peek() == ']' {
-						p.next()
-					} else {
-						for {
-							it := nested.Append()
-							if err := p.parseIntoFielder(it); err != nil {
-								return err
-							}
-							p.skipWhitespace()
-							c := p.next()
-							if c == ']' {
-								break
-							}
-							if c != ',' {
-								return fmt.Err("json", "decode", "expected , or ]")
-							}
-							p.skipWhitespace()
-						}
-					}
-				} else {
-					if err := p.skipValue(); err != nil {
-						return err
-					}
-				}
-			} else {
-				if err := p.parseIntoPtr(ptr, field.Type); err != nil {
-					return err
-				}
-			}
-		}
-
-		p.skipWhitespace()
-		c := p.next()
-		if c == '}' {
-			break
-		}
-		if c != ',' {
-			return fmt.Err("json", "decode", "expected , or }")
-		}
-	}
-	return nil
-}
-

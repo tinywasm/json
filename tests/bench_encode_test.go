@@ -14,15 +14,23 @@ type benchUser struct {
     Score float64
 }
 
-var benchSchema = []fmt.Field{
-	{Name: "name", Type: fmt.FieldText},
-	{Name: "email", Type: fmt.FieldText},
-	{Name: "age", Type: fmt.FieldInt},
-	{Name: "score", Type: fmt.FieldFloat},
+func (u *benchUser) IsNil() bool { return u == nil }
+func (u *benchUser) EncodeFields(w fmt.FieldWriter) {
+	w.String("name", u.Name)
+	w.String("email", u.Email)
+	w.Int("age", u.Age)
+	w.Float("score", u.Score)
+}
+func (u *benchUser) DecodeFields(r fmt.FieldReader) error {
+	u.Name, _ = r.String("name")
+	u.Email, _ = r.String("email")
+	u.Age, _ = r.Int("age")
+	u.Score, _ = r.Float("score")
+	return nil
 }
 
-func (u *benchUser) Schema() []fmt.Field { return benchSchema }
-func (u *benchUser) Pointers() []any { return []any{&u.Name, &u.Email, &u.Age, &u.Score} }
+func (u *benchUser) Schema() []fmt.Field { return nil }
+func (u *benchUser) Pointers() []any { return nil }
 
 var benchInput = &benchUser{Name: "alice", Email: "alice@example.com", Age: 30, Score: 9.5}
 
