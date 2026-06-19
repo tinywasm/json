@@ -21,22 +21,22 @@ func TestParseBoolFalse(t *testing.T) {
 }
 
 func TestParseBoolInvalid(t *testing.T) {
-	m := &mockFielder{}
-	if err := json.Decode(`{"b":tru}`, m); err == nil {
+	m := &simpleModel{}
+	if err := json.Decode(`{"name":tru}`, m); err == nil {
 		t.Fatal("expected error for invalid bool true")
 	}
 }
 
 func TestParseBoolFalseInvalid(t *testing.T) {
-	m := &mockFielder{}
-	if err := json.Decode(`{"b":fals}`, m); err == nil {
+	m := &simpleModel{}
+	if err := json.Decode(`{"name":fals}`, m); err == nil {
 		t.Fatal("expected error for invalid bool false")
 	}
 }
 
 func TestParseNullInvalid(t *testing.T) {
-	m := &mockFielder{}
-	if err := json.Decode(`{"b":nul}`, m); err == nil {
+	m := &simpleModel{}
+	if err := json.Decode(`{"name":nul}`, m); err == nil {
 		t.Fatal("expected error for invalid null")
 	}
 }

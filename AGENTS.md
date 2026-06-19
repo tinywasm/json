@@ -8,9 +8,8 @@ rules below (do not duplicate them in plans).
 
 `tinywasm/json` is a **reflection-free, map-free** JSON encoder/decoder for TinyGo + WASM. It is
 the ecosystem **exemplar** for typed serialization: it never imports `encoding/json`, `reflect`,
-or uses `map`. Encoding/decoding is driven by the model's typed contract (today `fmt.Fielder`
-via `Schema()`/`Pointers()`; migrating to the typed codec `fmt.Encodable`/`fmt.Decodable` — see
-`docs/PLAN.md`).
+or uses `map`. Encoding/decoding is driven by the model's typed contract (`fmt.Encodable`/
+`fmt.Decodable` — see `docs/PLAN.md`).
 
 ## Ecosystem restrictions (do NOT violate)
 

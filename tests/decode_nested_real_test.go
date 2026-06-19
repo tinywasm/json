@@ -19,15 +19,17 @@ type toolInput struct {
 	Verbose bool
 }
 
-func (t *toolInput) Schema() []fmt.Field {
-	return []fmt.Field{
-		{Name: "query", Type: fmt.FieldText},
-		{Name: "limit", Type: fmt.FieldInt},
-		{Name: "verbose", Type: fmt.FieldBool},
-	}
+func (t *toolInput) IsNil() bool { return t == nil }
+func (t *toolInput) EncodeFields(w fmt.FieldWriter) {
+	w.String("query", t.Query)
+	w.Int("limit", t.Limit)
+	w.Bool("verbose", t.Verbose)
 }
-func (t *toolInput) Pointers() []any {
-	return []any{&t.Query, &t.Limit, &t.Verbose}
+func (t *toolInput) DecodeFields(r fmt.FieldReader) error {
+	t.Query, _ = r.String("query")
+	t.Limit, _ = r.Int("limit")
+	t.Verbose, _ = r.Bool("verbose")
+	return nil
 }
 
 type toolParams struct {
@@ -35,14 +37,15 @@ type toolParams struct {
 	Input toolInput
 }
 
-func (t *toolParams) Schema() []fmt.Field {
-	return []fmt.Field{
-		{Name: "name", Type: fmt.FieldText},
-		{Name: "input", Type: fmt.FieldStruct},
-	}
+func (t *toolParams) IsNil() bool { return t == nil }
+func (t *toolParams) EncodeFields(w fmt.FieldWriter) {
+	w.String("name", t.Name)
+	w.Object("input", &t.Input)
 }
-func (t *toolParams) Pointers() []any {
-	return []any{&t.Name, &t.Input}
+func (t *toolParams) DecodeFields(r fmt.FieldReader) error {
+	t.Name, _ = r.String("name")
+	r.Object("input", &t.Input)
+	return nil
 }
 
 type toolCall struct {
@@ -51,15 +54,17 @@ type toolCall struct {
 	Params toolParams
 }
 
-func (t *toolCall) Schema() []fmt.Field {
-	return []fmt.Field{
-		{Name: "id", Type: fmt.FieldInt},
-		{Name: "method", Type: fmt.FieldText},
-		{Name: "params", Type: fmt.FieldStruct},
-	}
+func (t *toolCall) IsNil() bool { return t == nil }
+func (t *toolCall) EncodeFields(w fmt.FieldWriter) {
+	w.Int("id", t.ID)
+	w.String("method", t.Method)
+	w.Object("params", &t.Params)
 }
-func (t *toolCall) Pointers() []any {
-	return []any{&t.ID, &t.Method, &t.Params}
+func (t *toolCall) DecodeFields(r fmt.FieldReader) error {
+	t.ID, _ = r.Int("id")
+	t.Method, _ = r.String("method")
+	r.Object("params", &t.Params)
+	return nil
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────

@@ -39,32 +39,32 @@ func TestParseStringUnicode(t *testing.T) {
 }
 
 func TestParseStringUnicodeShort(t *testing.T) {
-	m := &mockFielder{}
-	input := `{"s":"\u004"}`
+	m := &simpleModel{}
+	input := `{"name":"\u004"}`
 	if err := json.Decode(input, m); err == nil {
 		t.Fatal("expected error for short unicode escape")
 	}
 }
 
 func TestParseStringInvalidEscape(t *testing.T) {
-	m := &mockFielder{}
-	input := `{"s":"\q"}`
+	m := &simpleModel{}
+	input := `{"name":"\q"}`
 	if err := json.Decode(input, m); err == nil {
 		t.Fatal("expected error for invalid escape sequence")
 	}
 }
 
 func TestParseStringUnexpectedEOF(t *testing.T) {
-	m := &mockFielder{}
-	input := `{"s":"abc`
+	m := &simpleModel{}
+	input := `{"name":"abc`
 	if err := json.Decode(input, m); err == nil {
 		t.Fatal("expected error for unexpected EOF")
 	}
 }
 
 func TestParseStringNotQuote(t *testing.T) {
-	m := &mockFielder{}
-	input := `{key:1}`
+	m := &simpleModel{}
+	input := `{name:1}`
 	if err := json.Decode(input, m); err == nil {
 		t.Fatal("expected error for key not starting with quote")
 	}

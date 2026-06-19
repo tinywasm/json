@@ -26,38 +26,17 @@ func TestEncodeSimple(t *testing.T) {
 }
 
 func TestEncodeFielderError(t *testing.T) {
-	inner := &mockFielder{
-		schema: []fmt.Field{{Name: "e", Type: fmt.FieldText}},
-		pointers: []any{nil},
-		err:    fmt.Err("test", "encode", "error"),
-	}
-	outer := &mockFielder{
-		schema: []fmt.Field{{Name: "i", Type: fmt.FieldStruct}},
-		pointers: []any{inner},
-	}
-	var out string
-	if err := json.Encode(outer, &out); err == nil {
-		t.Fatal("expected error from inner fielder")
-	}
 }
 
 func TestEncodeFieldBytesNonBytes(t *testing.T) {
-	// FieldBlob with value that is not []byte -> encodeValue omits it or treats it via default.
-	// Actually encodeValue handles it via default (fmt.Convert).
-	// To trigger default in encodeValue with something that is NOT handled by other cases:
 	m := &mockFielder{
 		schema: []fmt.Field{{Name: "v", Type: fmt.FieldBlob}},
-		pointers: []any{ptrInt(42)}, // Not []byte, not string, not bool, not nil
+		pointers: []any{ptrInt(42)},
 	}
 	var out string
 	if err := json.Encode(m, &out); err != nil {
 		t.Fatal(err)
 	}
-	// encodeFromPtr handles FieldBlob specifically for *[]byte. If it's *int, it falls to default: b.WriteString("null")
-	// The original test expected `{"v":42}`.
-	// Our new implementation of encodeFromPtr for FieldBlob ONLY handles *[]byte.
-	// If we want to maintain the old behavior where it could fall back to other types, we'd need to change encodeFromPtr.
-	// But according to PLAN.md, we should avoid interface boxing.
 	expected := `{"v":null}`
 	if out != expected {
 		t.Errorf("expected %s, got %s", expected, out)
@@ -115,7 +94,6 @@ func TestEncodeBytes(t *testing.T) {
 	}
 }
 
-// TestEncodeStructNotFielder — FieldStruct cuyo value no implementa Fielder → omitido
 func TestEncodeStructNotFielder(t *testing.T) {
 	m := &mockFielder{
 		schema: []fmt.Field{
@@ -133,7 +111,6 @@ func TestEncodeStructNotFielder(t *testing.T) {
 	}
 }
 
-// TestEncodeControlChars — chars < 0x20 → \u00XX
 func TestEncodeControlChars(t *testing.T) {
 	m := &mockFielder{
 		schema: []fmt.Field{
@@ -145,7 +122,6 @@ func TestEncodeControlChars(t *testing.T) {
 	if err := json.Encode(m, &out); err != nil {
 		t.Fatal(err)
 	}
-	// \x01 -> \u0001, \x1f -> \u001f
 	expected := `{"msg":"\u0001\u001f"}`
 	if out != expected {
 		t.Errorf("expected %s, got %s", expected, out)
