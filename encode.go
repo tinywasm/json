@@ -1,22 +1,10 @@
 package json
 
 import (
-	"github.com/tinywasm/fmt"
 	"io"
-	"sync"
+
+	"github.com/tinywasm/fmt"
 )
-
-var writerPool = sync.Pool{
-	New: func() any {
-		return &jsonWriter{}
-	},
-}
-
-var arrayWriterPool = sync.Pool{
-	New: func() any {
-		return &jsonArrayWriter{}
-	},
-}
 
 type jsonWriter struct {
 	b     *fmt.Conv
@@ -102,19 +90,19 @@ func (w *jsonWriter) Object(name string, val fmt.Encodable) {
 	}
 
 	w.b.WriteByte('{')
-	iw := writerPool.Get().(*jsonWriter)
+	iw := getWriter()
 	iw.b = w.b
 	iw.first = true
 	val.EncodeFields(iw)
 	w.b.WriteByte('}')
-	writerPool.Put(iw)
+	putWriter(iw)
 }
 
 func (w *jsonWriter) Array(name string, n int) fmt.ArrayWriter {
 	w.maybeComma()
 	w.writeKey(name)
 	w.b.WriteByte('[')
-	aw := arrayWriterPool.Get().(*jsonArrayWriter)
+	aw := getArrayWriter()
 	aw.b = w.b
 	aw.first = true
 	return aw
@@ -176,17 +164,17 @@ func (w *jsonArrayWriter) Object(val fmt.Encodable) {
 		return
 	}
 	w.b.WriteByte('{')
-	iw := writerPool.Get().(*jsonWriter)
+	iw := getWriter()
 	iw.b = w.b
 	iw.first = true
 	val.EncodeFields(iw)
 	w.b.WriteByte('}')
-	writerPool.Put(iw)
+	putWriter(iw)
 }
 
 func (w *jsonArrayWriter) Close() {
 	w.b.WriteByte(']')
-	arrayWriterPool.Put(w)
+	putArrayWriter(w)
 }
 
 // Encode serializes an Encodable to JSON.
@@ -198,7 +186,7 @@ func Encode(data fmt.Encodable, output any) error {
 	if data == nil || data.IsNil() {
 		b.WriteString("null")
 	} else {
-		w := writerPool.Get().(*jsonWriter)
+		w := getWriter()
 		w.b = b
 		w.first = true
 
@@ -216,7 +204,7 @@ func Encode(data fmt.Encodable, output any) error {
 					b.WriteByte(',')
 				}
 				if it, ok := slice.At(i).(fmt.Encodable); ok {
-					iw := writerPool.Get().(*jsonWriter)
+					iw := getWriter()
 					iw.b = b
 					iw.first = true
 					if it.IsNil() {
@@ -226,7 +214,7 @@ func Encode(data fmt.Encodable, output any) error {
 						it.EncodeFields(iw)
 						b.WriteByte('}')
 					}
-					writerPool.Put(iw)
+					putWriter(iw)
 				} else {
 					b.WriteString("null")
 				}
@@ -237,7 +225,7 @@ func Encode(data fmt.Encodable, output any) error {
 			data.EncodeFields(w)
 			b.WriteByte('}')
 		}
-		writerPool.Put(w)
+		putWriter(w)
 	}
 
 	if b.GetString(fmt.BuffErr) != "" {

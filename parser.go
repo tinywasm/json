@@ -1,19 +1,10 @@
 package json
 
-import (
-	"github.com/tinywasm/fmt"
-	"sync"
-)
+import "github.com/tinywasm/fmt"
 
 type parser struct {
 	data []byte
 	pos  int
-}
-
-var readerPool = sync.Pool{
-	New: func() any {
-		return &jsonReader{}
-	},
 }
 
 type jsonReader struct {
@@ -217,22 +208,22 @@ func (r *jsonReader) Object(name string, into fmt.Decodable) bool {
 		return false
 	}
 	objStart := r.p.pos
-	innerReader := readerPool.Get().(*jsonReader)
+	innerReader := getReader()
 	innerReader.p = r.p
 	innerReader.start = objStart
 	innerReader.err = nil
 	err = into.DecodeFields(innerReader)
 	if err != nil {
 		r.err = err
-		readerPool.Put(innerReader)
+		putReader(innerReader)
 		return false
 	}
 	if innerReader.err != nil {
 		r.err = innerReader.err
-		readerPool.Put(innerReader)
+		putReader(innerReader)
 		return false
 	}
-	readerPool.Put(innerReader)
+	putReader(innerReader)
 	r.p.pos = objStart
 	r.p.skipObject()
 	return true
@@ -427,14 +418,14 @@ func (r jsonArrayReader) Object(i int, into fmt.Decodable) bool {
 		return false
 	}
 	objStart := r.p.pos
-	innerReader := readerPool.Get().(*jsonReader)
+	innerReader := getReader()
 	innerReader.p = r.p
 	innerReader.start = objStart
 	innerReader.err = nil
 	err := into.DecodeFields(innerReader)
 	r.p.pos = objStart
 	r.p.skipObject()
-	readerPool.Put(innerReader)
+	putReader(innerReader)
 	return err == nil
 }
 
