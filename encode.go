@@ -77,6 +77,16 @@ func (w *jsonWriter) Null(name string) {
 	w.b.WriteString("null")
 }
 
+func (w *jsonWriter) Raw(name, val string) {
+	w.maybeComma()
+	w.writeKey(name)
+	if val == "" {
+		w.b.WriteString("null")
+		return
+	}
+	w.b.WriteString(val)
+}
+
 func (w *jsonWriter) Object(name string, val fmt.Encodable) {
 	w.maybeComma()
 	w.writeKey(name)
