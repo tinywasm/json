@@ -40,10 +40,10 @@ func Decode(input any, data fmt.Decodable) error {
 	p := parser{data: raw}
 	p.skipWhitespace()
 
-	r := readerPool.Get().(*jsonReader)
+	r := getReader()
 	r.p = &p
 	r.err = nil
-	defer readerPool.Put(r)
+	defer putReader(r)
 
 	var slice fmt.FielderSlice
 	if s, ok := data.(interface{ FielderSlice() fmt.FielderSlice }); ok {
