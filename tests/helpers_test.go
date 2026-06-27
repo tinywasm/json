@@ -18,7 +18,7 @@ func (m *mockFielder) Pointers() []any {
 
 func (m *mockFielder) IsNil() bool { return m == nil }
 
-func (m *mockFielder) DecodeFields(r fmt.FieldReader) error {
+func (m *mockFielder) DecodeFields(r fmt.FieldReader) {
 	for i, f := range m.schema {
 		ptr := m.pointers[i]
 		switch f.Type {
@@ -90,7 +90,6 @@ func (m *mockFielder) DecodeFields(r fmt.FieldReader) error {
 			}
 		}
 	}
-	return nil
 }
 
 func (m *mockFielder) EncodeFields(w fmt.FieldWriter) {
@@ -246,11 +245,10 @@ func (m *simpleModel) EncodeFields(w fmt.FieldWriter) {
 	w.Bool("active", m.Active)
 }
 
-func (m *simpleModel) DecodeFields(r fmt.FieldReader) error {
+func (m *simpleModel) DecodeFields(r fmt.FieldReader) {
 	m.Name, _ = r.String("name")
 	m.Age, _ = r.Int("age")
 	m.Active, _ = r.Bool("active")
-	return nil
 }
 
 func (m *simpleModel) IsNil() bool { return m == nil }

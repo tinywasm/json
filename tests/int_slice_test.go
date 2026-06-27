@@ -27,7 +27,7 @@ func (f *FontDef) EncodeFields(w fmt.FieldWriter) {
 		w.Null("Cw")
 	}
 }
-func (f *FontDef) DecodeFields(r fmt.FieldReader) error {
+func (f *FontDef) DecodeFields(r fmt.FieldReader) {
 	f.Name, _ = r.String("Name")
 	if ar, ok := r.Array("Cw"); ok {
 		n := ar.Len()
@@ -36,7 +36,6 @@ func (f *FontDef) DecodeFields(r fmt.FieldReader) error {
 			f.Cw[i] = int(ar.Int(i))
 		}
 	}
-	return nil
 }
 
 func TestDecodeIntSlice(t *testing.T) {

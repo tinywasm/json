@@ -16,10 +16,9 @@ func (s *TestStruct) EncodeFields(w fmt.FieldWriter) {
 	w.String("name", s.Name)
 	w.Int("age", s.Age)
 }
-func (s *TestStruct) DecodeFields(r fmt.FieldReader) error {
+func (s *TestStruct) DecodeFields(r fmt.FieldReader) {
 	s.Name, _ = r.String("name")
 	s.Age, _ = r.Int("age")
-	return nil
 }
 
 func TestIntegration(t *testing.T) {

@@ -27,11 +27,10 @@ func (i *item) EncodeFields(w fmt.FieldWriter) {
 	w.Int("id", int64(i.ID))
 	w.String("name", i.Name)
 }
-func (i *item) DecodeFields(r fmt.FieldReader) error {
+func (i *item) DecodeFields(r fmt.FieldReader) {
 	id, _ := r.Int("id")
 	i.ID = int(id)
 	i.Name, _ = r.String("name")
-	return nil
 }
 
 type itemSlice struct {
@@ -47,7 +46,7 @@ func (s *itemSlice) Append() fmt.Fielder {
 }
 func (s *itemSlice) IsNil() bool                       { return s == nil }
 func (s *itemSlice) EncodeFields(w fmt.FieldWriter)    {}
-func (s *itemSlice) DecodeFields(r fmt.FieldReader) error { return nil }
+func (s *itemSlice) DecodeFields(r fmt.FieldReader) {}
 func (s *itemSlice) Schema() []fmt.Field { return nil }
 func (s *itemSlice) Pointers() []any     { return nil }
 func (s *itemSlice) FielderSlice() fmt.FielderSlice    { return s }
@@ -75,7 +74,7 @@ func (m *rootModel) EncodeFields(w fmt.FieldWriter) {
 		w.Null("schedule")
 	}
 }
-func (m *rootModel) DecodeFields(r fmt.FieldReader) error {
+func (m *rootModel) DecodeFields(r fmt.FieldReader) {
 	m.Name, _ = r.String("staff_name")
 	if ar, ok := r.Array("schedule"); ok {
 		n := ar.Len()
@@ -86,7 +85,6 @@ func (m *rootModel) DecodeFields(r fmt.FieldReader) error {
 			ar.Object(i, it)
 		}
 	}
-	return nil
 }
 
 func TestEncodeFieldStructSlice(t *testing.T) {

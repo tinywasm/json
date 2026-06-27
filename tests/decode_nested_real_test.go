@@ -25,11 +25,10 @@ func (t *toolInput) EncodeFields(w fmt.FieldWriter) {
 	w.Int("limit", t.Limit)
 	w.Bool("verbose", t.Verbose)
 }
-func (t *toolInput) DecodeFields(r fmt.FieldReader) error {
+func (t *toolInput) DecodeFields(r fmt.FieldReader) {
 	t.Query, _ = r.String("query")
 	t.Limit, _ = r.Int("limit")
 	t.Verbose, _ = r.Bool("verbose")
-	return nil
 }
 
 type toolParams struct {
@@ -42,10 +41,9 @@ func (t *toolParams) EncodeFields(w fmt.FieldWriter) {
 	w.String("name", t.Name)
 	w.Object("input", &t.Input)
 }
-func (t *toolParams) DecodeFields(r fmt.FieldReader) error {
+func (t *toolParams) DecodeFields(r fmt.FieldReader) {
 	t.Name, _ = r.String("name")
 	r.Object("input", &t.Input)
-	return nil
 }
 
 type toolCall struct {
@@ -60,11 +58,10 @@ func (t *toolCall) EncodeFields(w fmt.FieldWriter) {
 	w.String("method", t.Method)
 	w.Object("params", &t.Params)
 }
-func (t *toolCall) DecodeFields(r fmt.FieldReader) error {
+func (t *toolCall) DecodeFields(r fmt.FieldReader) {
 	t.ID, _ = r.Int("id")
 	t.Method, _ = r.String("method")
 	r.Object("params", &t.Params)
-	return nil
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────

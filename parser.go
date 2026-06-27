@@ -212,12 +212,7 @@ func (r *jsonReader) Object(name string, into fmt.Decodable) bool {
 	innerReader.p = r.p
 	innerReader.start = objStart
 	innerReader.err = nil
-	err = into.DecodeFields(innerReader)
-	if err != nil {
-		r.err = err
-		putReader(innerReader)
-		return false
-	}
+	into.DecodeFields(innerReader)
 	if innerReader.err != nil {
 		r.err = innerReader.err
 		putReader(innerReader)
@@ -422,11 +417,11 @@ func (r jsonArrayReader) Object(i int, into fmt.Decodable) bool {
 	innerReader.p = r.p
 	innerReader.start = objStart
 	innerReader.err = nil
-	err := into.DecodeFields(innerReader)
+	into.DecodeFields(innerReader)
 	r.p.pos = objStart
 	r.p.skipObject()
 	putReader(innerReader)
-	return err == nil
+	return innerReader.err == nil
 }
 
 func (p *parser) skipWhitespace() {

@@ -15,9 +15,7 @@ func (r *rawFielder) EncodeFields(w fmt.FieldWriter) {
 	w.Raw("null_raw", "")
 }
 
-func (r *rawFielder) DecodeFields(rdr fmt.FieldReader) error {
-	return nil
-}
+func (r *rawFielder) DecodeFields(rdr fmt.FieldReader) {}
 
 func (r *rawFielder) IsNil() bool {
 	return r == nil
@@ -41,10 +39,9 @@ type decodeRawStruct struct {
 }
 
 func (d *decodeRawStruct) EncodeFields(w fmt.FieldWriter) {}
-func (d *decodeRawStruct) DecodeFields(r fmt.FieldReader) error {
+func (d *decodeRawStruct) DecodeFields(r fmt.FieldReader) {
 	d.rawVal, _ = r.Raw("raw")
 	d.textVal, _ = r.String("text")
-	return nil
 }
 func (d *decodeRawStruct) IsNil() bool { return d == nil }
 

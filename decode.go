@@ -73,8 +73,6 @@ func Decode(input any, data fmt.Decodable) error {
 	}
 	start := p.pos
 	r.start = start
-	if err := data.DecodeFields(r); err != nil {
-		return err
-	}
+	data.DecodeFields(r)
 	return r.err
 }

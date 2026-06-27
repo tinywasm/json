@@ -21,12 +21,11 @@ func (u *benchUser) EncodeFields(w fmt.FieldWriter) {
 	w.Int("age", u.Age)
 	w.Float("score", u.Score)
 }
-func (u *benchUser) DecodeFields(r fmt.FieldReader) error {
+func (u *benchUser) DecodeFields(r fmt.FieldReader) {
 	u.Name, _ = r.String("name")
 	u.Email, _ = r.String("email")
 	u.Age, _ = r.Int("age")
 	u.Score, _ = r.Float("score")
-	return nil
 }
 
 func (u *benchUser) Schema() []fmt.Field { return nil }
