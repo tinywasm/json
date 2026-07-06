@@ -1,8 +1,9 @@
 package tests
 
+import "github.com/tinywasm/model"
+
 import (
 	"github.com/tinywasm/json"
-	"github.com/tinywasm/fmt"
 	"testing"
 )
 
@@ -11,10 +12,10 @@ func TestDecodeSimple(t *testing.T) {
 	var age int64
 	var active bool
 	m := &mockFielder{
-		schema: []fmt.Field{
-			{Name: "name", Type: fmt.FieldText},
-			{Name: "age", Type: fmt.FieldInt},
-			{Name: "active", Type: fmt.FieldBool},
+		schema: []model.Field{
+			{Name: "name", Type: model.FieldText},
+			{Name: "age", Type: model.FieldInt},
+			{Name: "active", Type: model.FieldBool},
 		},
 		pointers: []any{&name, &age, &active},
 	}
@@ -30,16 +31,16 @@ func TestDecodeSimple(t *testing.T) {
 func TestDecodeNested(t *testing.T) {
 	var city string
 	inner := &mockFielder{
-		schema: []fmt.Field{
-			{Name: "city", Type: fmt.FieldText},
+		schema: []model.Field{
+			{Name: "city", Type: model.FieldText},
 		},
 		pointers: []any{&city},
 	}
 	var user string
 	outer := &mockFielder{
-		schema: []fmt.Field{
-			{Name: "user", Type: fmt.FieldText},
-			{Name: "address", Type: fmt.FieldStruct},
+		schema: []model.Field{
+			{Name: "user", Type: model.FieldText},
+			{Name: "address", Type: model.FieldStruct},
 		},
 		pointers: []any{&user, inner},
 	}
@@ -55,8 +56,8 @@ func TestDecodeNested(t *testing.T) {
 func TestDecodeStringEscapes(t *testing.T) {
 	var msg string
 	m := &mockFielder{
-		schema: []fmt.Field{
-			{Name: "msg", Type: fmt.FieldText},
+		schema: []model.Field{
+			{Name: "msg", Type: model.FieldText},
 		},
 		pointers: []any{&msg},
 	}
@@ -73,8 +74,8 @@ func TestDecodeStringEscapes(t *testing.T) {
 func TestDecodeNull(t *testing.T) {
 	name := "Alice"
 	m := &mockFielder{
-		schema: []fmt.Field{
-			{Name: "name", Type: fmt.FieldText},
+		schema: []model.Field{
+			{Name: "name", Type: model.FieldText},
 		},
 		pointers: []any{&name},
 	}
@@ -90,8 +91,8 @@ func TestDecodeNull(t *testing.T) {
 func TestDecodeBytes(t *testing.T) {
 	var data []byte
 	m := &mockFielder{
-		schema: []fmt.Field{
-			{Name: "data", Type: fmt.FieldBlob},
+		schema: []model.Field{
+			{Name: "data", Type: model.FieldBlob},
 		},
 		pointers: []any{&data},
 	}

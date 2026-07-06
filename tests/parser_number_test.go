@@ -1,15 +1,16 @@
 package tests
 
+import "github.com/tinywasm/model"
+
 import (
 	"github.com/tinywasm/json"
-	"github.com/tinywasm/fmt"
 	"testing"
 )
 
 func TestParseNumberNegative(t *testing.T) {
 	var n int64
 	m := &mockFielder{
-		schema: []fmt.Field{{Name: "n", Type: fmt.FieldInt}},
+		schema:   []model.Field{{Name: "n", Type: model.FieldInt}},
 		pointers: []any{&n},
 	}
 	input := `{"n":-42}`
@@ -24,7 +25,7 @@ func TestParseNumberNegative(t *testing.T) {
 func TestParseNumberScientific(t *testing.T) {
 	var f float64
 	m := &mockFielder{
-		schema: []fmt.Field{{Name: "f", Type: fmt.FieldFloat}},
+		schema:   []model.Field{{Name: "f", Type: model.FieldFloat}},
 		pointers: []any{&f},
 	}
 	input := `{"f":1e2}`

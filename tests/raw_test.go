@@ -2,7 +2,7 @@ package tests
 
 import (
 	"github.com/tinywasm/json"
-	"github.com/tinywasm/fmt"
+	"github.com/tinywasm/model"
 	"testing"
 )
 
@@ -10,12 +10,12 @@ type rawFielder struct {
 	raw string
 }
 
-func (r *rawFielder) EncodeFields(w fmt.FieldWriter) {
+func (r *rawFielder) EncodeFields(w model.FieldWriter) {
 	w.Raw("raw", r.raw)
 	w.Raw("null_raw", "")
 }
 
-func (r *rawFielder) DecodeFields(rdr fmt.FieldReader) {}
+func (r *rawFielder) DecodeFields(rdr model.FieldReader) {}
 
 func (r *rawFielder) IsNil() bool {
 	return r == nil
@@ -38,8 +38,8 @@ type decodeRawStruct struct {
 	textVal string
 }
 
-func (d *decodeRawStruct) EncodeFields(w fmt.FieldWriter) {}
-func (d *decodeRawStruct) DecodeFields(r fmt.FieldReader) {
+func (d *decodeRawStruct) EncodeFields(w model.FieldWriter) {}
+func (d *decodeRawStruct) DecodeFields(r model.FieldReader) {
 	d.rawVal, _ = r.Raw("raw")
 	d.textVal, _ = r.String("text")
 }

@@ -1,15 +1,16 @@
 package tests
 
+import "github.com/tinywasm/model"
+
 import (
 	"github.com/tinywasm/json"
-	"github.com/tinywasm/fmt"
 	"testing"
 )
 
 func TestParseBoolFalse(t *testing.T) {
 	var b bool = true
 	m := &mockFielder{
-		schema: []fmt.Field{{Name: "b", Type: fmt.FieldBool}},
+		schema:   []model.Field{{Name: "b", Type: model.FieldBool}},
 		pointers: []any{&b},
 	}
 	if err := json.Decode(`{"b":false}`, m); err != nil {

@@ -6,8 +6,8 @@ package tests
 // every level, arrays discarded, and sibling fields after nested structs.
 
 import (
-	"github.com/tinywasm/fmt"
 	"github.com/tinywasm/json"
+	"github.com/tinywasm/model"
 	"testing"
 )
 
@@ -20,12 +20,12 @@ type toolInput struct {
 }
 
 func (t *toolInput) IsNil() bool { return t == nil }
-func (t *toolInput) EncodeFields(w fmt.FieldWriter) {
+func (t *toolInput) EncodeFields(w model.FieldWriter) {
 	w.String("query", t.Query)
 	w.Int("limit", t.Limit)
 	w.Bool("verbose", t.Verbose)
 }
-func (t *toolInput) DecodeFields(r fmt.FieldReader) {
+func (t *toolInput) DecodeFields(r model.FieldReader) {
 	t.Query, _ = r.String("query")
 	t.Limit, _ = r.Int("limit")
 	t.Verbose, _ = r.Bool("verbose")
@@ -37,11 +37,11 @@ type toolParams struct {
 }
 
 func (t *toolParams) IsNil() bool { return t == nil }
-func (t *toolParams) EncodeFields(w fmt.FieldWriter) {
+func (t *toolParams) EncodeFields(w model.FieldWriter) {
 	w.String("name", t.Name)
 	w.Object("input", &t.Input)
 }
-func (t *toolParams) DecodeFields(r fmt.FieldReader) {
+func (t *toolParams) DecodeFields(r model.FieldReader) {
 	t.Name, _ = r.String("name")
 	r.Object("input", &t.Input)
 }
@@ -53,12 +53,12 @@ type toolCall struct {
 }
 
 func (t *toolCall) IsNil() bool { return t == nil }
-func (t *toolCall) EncodeFields(w fmt.FieldWriter) {
+func (t *toolCall) EncodeFields(w model.FieldWriter) {
 	w.Int("id", t.ID)
 	w.String("method", t.Method)
 	w.Object("params", &t.Params)
 }
-func (t *toolCall) DecodeFields(r fmt.FieldReader) {
+func (t *toolCall) DecodeFields(r model.FieldReader) {
 	t.ID, _ = r.Int("id")
 	t.Method, _ = r.String("method")
 	r.Object("params", &t.Params)

@@ -1,7 +1,8 @@
 package tests
 
+import "github.com/tinywasm/model"
+
 import (
-	"github.com/tinywasm/fmt"
 	"github.com/tinywasm/json"
 	"testing"
 )
@@ -11,10 +12,10 @@ type item struct {
 	Name string
 }
 
-func (i *item) Schema() []fmt.Field {
-	return []fmt.Field{
-		{Name: "id", Type: fmt.FieldInt},
-		{Name: "name", Type: fmt.FieldText},
+func (i *item) Schema() []model.Field {
+	return []model.Field{
+		{Name: "id", Type: model.FieldInt},
+		{Name: "name", Type: model.FieldText},
 	}
 }
 
@@ -23,11 +24,11 @@ func (i *item) Pointers() []any {
 }
 
 func (i *item) IsNil() bool { return i == nil }
-func (i *item) EncodeFields(w fmt.FieldWriter) {
+func (i *item) EncodeFields(w model.FieldWriter) {
 	w.Int("id", int64(i.ID))
 	w.String("name", i.Name)
 }
-func (i *item) DecodeFields(r fmt.FieldReader) {
+func (i *item) DecodeFields(r model.FieldReader) {
 	id, _ := r.Int("id")
 	i.ID = int(id)
 	i.Name, _ = r.String("name")
@@ -37,19 +38,19 @@ type itemSlice struct {
 	items []*item
 }
 
-func (s *itemSlice) Len() int           { return len(s.items) }
-func (s *itemSlice) At(i int) fmt.Fielder { return s.items[i] }
-func (s *itemSlice) Append() fmt.Fielder {
+func (s *itemSlice) Len() int               { return len(s.items) }
+func (s *itemSlice) At(i int) model.Fielder { return s.items[i] }
+func (s *itemSlice) Append() model.Fielder {
 	it := &item{}
 	s.items = append(s.items, it)
 	return it
 }
-func (s *itemSlice) IsNil() bool                       { return s == nil }
-func (s *itemSlice) EncodeFields(w fmt.FieldWriter)    {}
-func (s *itemSlice) DecodeFields(r fmt.FieldReader) {}
-func (s *itemSlice) Schema() []fmt.Field { return nil }
-func (s *itemSlice) Pointers() []any     { return nil }
-func (s *itemSlice) FielderSlice() fmt.FielderSlice    { return s }
+func (s *itemSlice) IsNil() bool                      { return s == nil }
+func (s *itemSlice) EncodeFields(w model.FieldWriter) {}
+func (s *itemSlice) DecodeFields(r model.FieldReader) {}
+func (s *itemSlice) Schema() []model.Field            { return nil }
+func (s *itemSlice) Pointers() []any                  { return nil }
+func (s *itemSlice) FielderSlice() model.FielderSlice { return s }
 
 type rootModel struct {
 	Name     string
@@ -57,13 +58,13 @@ type rootModel struct {
 }
 
 func (m *rootModel) IsNil() bool { return m == nil }
-func (m *rootModel) EncodeFields(w fmt.FieldWriter) {
+func (m *rootModel) EncodeFields(w model.FieldWriter) {
 	w.String("staff_name", m.Name)
 	if m.Schedule != nil {
 		n := m.Schedule.Len()
 		aw := w.Array("schedule", n)
 		for i := 0; i < n; i++ {
-			if it, ok := m.Schedule.At(i).(fmt.Encodable); ok {
+			if it, ok := m.Schedule.At(i).(model.Encodable); ok {
 				aw.Object(it)
 			}
 		}
@@ -74,7 +75,7 @@ func (m *rootModel) EncodeFields(w fmt.FieldWriter) {
 		w.Null("schedule")
 	}
 }
-func (m *rootModel) DecodeFields(r fmt.FieldReader) {
+func (m *rootModel) DecodeFields(r model.FieldReader) {
 	m.Name, _ = r.String("staff_name")
 	if ar, ok := r.Array("schedule"); ok {
 		n := ar.Len()
@@ -149,7 +150,7 @@ func TestEncodeFieldStructSlice_Nil(t *testing.T) {
 
 func TestDecodeFieldStructSlice(t *testing.T) {
 	input := `{"staff_name":"Dra. Ana","schedule":[{"id":101,"name":"Alice"},{"id":102,"name":"Bob"}]}`
-	
+
 	parent := &rootModel{}
 
 	if err := json.Decode(input, parent); err != nil {

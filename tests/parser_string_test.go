@@ -1,15 +1,16 @@
 package tests
 
+import "github.com/tinywasm/model"
+
 import (
 	"github.com/tinywasm/json"
-	"github.com/tinywasm/fmt"
 	"testing"
 )
 
 func TestParseStringEscapeBF(t *testing.T) {
 	var s string
 	m := &mockFielder{
-		schema: []fmt.Field{{Name: "s", Type: fmt.FieldText}},
+		schema:   []model.Field{{Name: "s", Type: model.FieldText}},
 		pointers: []any{&s},
 	}
 	input := `{"s":"\b\f\/"}`
@@ -25,7 +26,7 @@ func TestParseStringEscapeBF(t *testing.T) {
 func TestParseStringUnicode(t *testing.T) {
 	var s string
 	m := &mockFielder{
-		schema: []fmt.Field{{Name: "s", Type: fmt.FieldText}},
+		schema:   []model.Field{{Name: "s", Type: model.FieldText}},
 		pointers: []any{&s},
 	}
 	input := `{"s":"\u0041"}`

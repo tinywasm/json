@@ -1,17 +1,18 @@
 package tests
 
+import "github.com/tinywasm/model"
+
 import (
 	"bytes"
 	"github.com/tinywasm/json"
-	"github.com/tinywasm/fmt"
 	"testing"
 )
 
 func TestDecodeFromReader(t *testing.T) {
 	var name string
 	m := &mockFielder{
-		schema: []fmt.Field{
-			{Name: "name", Type: fmt.FieldText},
+		schema: []model.Field{
+			{Name: "name", Type: model.FieldText},
 		},
 		pointers: []any{&name},
 	}
@@ -49,8 +50,8 @@ func TestDecodeNotObject(t *testing.T) {
 func TestDecodeFromBytes(t *testing.T) {
 	var name string
 	m := &mockFielder{
-		schema: []fmt.Field{
-			{Name: "name", Type: fmt.FieldText},
+		schema: []model.Field{
+			{Name: "name", Type: model.FieldText},
 		},
 		pointers: []any{&name},
 	}

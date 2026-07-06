@@ -1,8 +1,8 @@
 package tests
 
 import (
-	"github.com/tinywasm/fmt"
 	"github.com/tinywasm/json"
+	"github.com/tinywasm/model"
 	"testing"
 )
 
@@ -12,11 +12,11 @@ type TestStruct struct {
 }
 
 func (s *TestStruct) IsNil() bool { return s == nil }
-func (s *TestStruct) EncodeFields(w fmt.FieldWriter) {
+func (s *TestStruct) EncodeFields(w model.FieldWriter) {
 	w.String("name", s.Name)
 	w.Int("age", s.Age)
 }
-func (s *TestStruct) DecodeFields(r fmt.FieldReader) {
+func (s *TestStruct) DecodeFields(r model.FieldReader) {
 	s.Name, _ = r.String("name")
 	s.Age, _ = r.Int("age")
 }

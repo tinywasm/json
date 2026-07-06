@@ -1,5 +1,7 @@
 package json
 
+import "github.com/tinywasm/model"
+
 import "github.com/tinywasm/fmt"
 
 type parser struct {
@@ -185,7 +187,7 @@ func (r *jsonReader) Raw(name string) (string, bool) {
 	return string(r.p.data[start:r.p.pos]), true
 }
 
-func (r *jsonReader) Object(name string, into fmt.Decodable) bool {
+func (r *jsonReader) Object(name string, into model.Decodable) bool {
 	found, err := r.scanToKey(name)
 	if err != nil {
 		r.err = err
@@ -224,7 +226,7 @@ func (r *jsonReader) Object(name string, into fmt.Decodable) bool {
 	return true
 }
 
-func (r *jsonReader) Array(name string) (fmt.ArrayReader, bool) {
+func (r *jsonReader) Array(name string) (model.ArrayReader, bool) {
 	found, err := r.scanToKey(name)
 	if err != nil {
 		r.err = err
@@ -404,7 +406,7 @@ func (r jsonArrayReader) Bytes(i int) []byte {
 	return []byte(r.String(i))
 }
 
-func (r jsonArrayReader) Object(i int, into fmt.Decodable) bool {
+func (r jsonArrayReader) Object(i int, into model.Decodable) bool {
 	if !r.seekToIndex(i) {
 		return false
 	}

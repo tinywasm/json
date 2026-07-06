@@ -1,5 +1,7 @@
 package json
 
+import "github.com/tinywasm/model"
+
 import (
 	"github.com/tinywasm/fmt"
 	"io"
@@ -8,7 +10,7 @@ import (
 
 // Decode parses JSON into a Decodable.
 // input: []byte | string | io.Reader.
-func Decode(input any, data fmt.Decodable) error {
+func Decode(input any, data model.Decodable) error {
 	if data == nil || data.IsNil() {
 		return fmt.Err("json", "decode", "destination is nil")
 	}
@@ -45,10 +47,10 @@ func Decode(input any, data fmt.Decodable) error {
 	r.err = nil
 	defer putReader(r)
 
-	var slice fmt.FielderSlice
-	if s, ok := data.(interface{ FielderSlice() fmt.FielderSlice }); ok {
+	var slice model.FielderSlice
+	if s, ok := data.(interface{ FielderSlice() model.FielderSlice }); ok {
 		slice = s.FielderSlice()
-	} else if s, ok := data.(fmt.FielderSlice); ok {
+	} else if s, ok := data.(model.FielderSlice); ok {
 		slice = s
 	}
 
@@ -61,7 +63,7 @@ func Decode(input any, data fmt.Decodable) error {
 		ar := jsonArrayReader{p: &p, start: arrayStart}
 		for i := 0; i < ar.Len(); i++ {
 			it := slice.Append()
-			if dec, ok := it.(fmt.Decodable); ok {
+			if dec, ok := it.(model.Decodable); ok {
 				ar.Object(i, dec)
 			}
 		}

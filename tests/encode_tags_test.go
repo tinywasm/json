@@ -1,22 +1,23 @@
 package tests
 
+import "github.com/tinywasm/model"
+
 import (
 	"github.com/tinywasm/json"
-	"github.com/tinywasm/fmt"
 	"testing"
 )
 
 func TestEncodeNested(t *testing.T) {
 	inner := &mockFielder{
-		schema: []fmt.Field{
-			{Name: "city", Type: fmt.FieldText},
+		schema: []model.Field{
+			{Name: "city", Type: model.FieldText},
 		},
 		pointers: []any{ptrString("Paris")},
 	}
 	outer := &mockFielder{
-		schema: []fmt.Field{
-			{Name: "user", Type: fmt.FieldText},
-			{Name: "address", Type: fmt.FieldStruct},
+		schema: []model.Field{
+			{Name: "user", Type: model.FieldText},
+			{Name: "address", Type: model.FieldStruct},
 		},
 		pointers: []any{ptrString("Alice"), inner},
 	}
@@ -60,10 +61,10 @@ func TestEncodeFieldRawRoundtrip(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			m := &mockFielder{
-				schema: []fmt.Field{
-					{Name: "jsonrpc", Type: fmt.FieldText},
-					{Name: "id", Type: fmt.FieldText},
-					{Name: "result", Type: fmt.FieldRaw, OmitEmpty: true},
+				schema: []model.Field{
+					{Name: "jsonrpc", Type: model.FieldText},
+					{Name: "id", Type: model.FieldText},
+					{Name: "result", Type: model.FieldRaw, OmitEmpty: true},
 				},
 				pointers: []any{ptrString(c.jsonrpc), ptrString(c.id), ptrString(c.result)},
 			}
@@ -80,9 +81,9 @@ func TestEncodeFieldRawRoundtrip(t *testing.T) {
 
 func TestEncodeOmitEmpty(t *testing.T) {
 	m := &mockFielder{
-		schema: []fmt.Field{
-			{Name: "name", Type: fmt.FieldText},
-			{Name: "age", Type: fmt.FieldInt, OmitEmpty: true},
+		schema: []model.Field{
+			{Name: "name", Type: model.FieldText},
+			{Name: "age", Type: model.FieldInt, OmitEmpty: true},
 		},
 		pointers: []any{ptrString("Alice"), ptrInt64(0)},
 	}

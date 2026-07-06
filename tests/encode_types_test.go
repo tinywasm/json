@@ -1,59 +1,60 @@
 package tests
 
+import "github.com/tinywasm/model"
+
 import (
 	"github.com/tinywasm/json"
-	"github.com/tinywasm/fmt"
 	"testing"
 )
 
 // TestEncodeNumericTypes — int, int32, int64, uint, uint64, float32, float64
 func TestEncodeNumericTypes(t *testing.T) {
-    cases := []struct {
-        name     string
-        ptr      any
-        ft       fmt.FieldType
-        expected string
-    }{
-        {"int", ptrInt(5), fmt.FieldInt, `{"v":5}`},
-        {"int32", ptrInt32(5), fmt.FieldInt, `{"v":5}`},
-        {"int64", ptrInt64(5), fmt.FieldInt, `{"v":5}`},
-        {"float32", ptrFloat32(1.5), fmt.FieldFloat, `{"v":1.5}`},
-        {"float64", ptrFloat64(1.5), fmt.FieldFloat, `{"v":1.5}`},
-        {"uint", ptrUint(5), fmt.FieldInt, `{"v":5}`},
-        {"uint64", ptrUint64(5), fmt.FieldInt, `{"v":5}`},
-    }
-    for _, c := range cases {
-        t.Run(c.name, func(t *testing.T) {
-            m := &mockFielder{
-                schema: []fmt.Field{{Name: "v", Type: c.ft}},
-                pointers: []any{c.ptr},
-            }
-            var out string
-            if err := json.Encode(m, &out); err != nil {
-                t.Fatal(err)
-            }
-            if out != c.expected {
-                t.Errorf("expected %s, got %s", c.expected, out)
-            }
-        })
-    }
+	cases := []struct {
+		name     string
+		ptr      any
+		ft       model.FieldType
+		expected string
+	}{
+		{"int", ptrInt(5), model.FieldInt, `{"v":5}`},
+		{"int32", ptrInt32(5), model.FieldInt, `{"v":5}`},
+		{"int64", ptrInt64(5), model.FieldInt, `{"v":5}`},
+		{"float32", ptrFloat32(1.5), model.FieldFloat, `{"v":1.5}`},
+		{"float64", ptrFloat64(1.5), model.FieldFloat, `{"v":1.5}`},
+		{"uint", ptrUint(5), model.FieldInt, `{"v":5}`},
+		{"uint64", ptrUint64(5), model.FieldInt, `{"v":5}`},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			m := &mockFielder{
+				schema:   []model.Field{{Name: "v", Type: c.ft}},
+				pointers: []any{c.ptr},
+			}
+			var out string
+			if err := json.Encode(m, &out); err != nil {
+				t.Fatal(err)
+			}
+			if out != c.expected {
+				t.Errorf("expected %s, got %s", c.expected, out)
+			}
+		})
+	}
 }
 
 func TestEncodeFieldRaw(t *testing.T) {
 	cases := []struct {
 		name     string
 		ptr      any
-		ft       fmt.FieldType
+		ft       model.FieldType
 		expected string
 	}{
-		{"raw object", ptrString(`{"a":1}`), fmt.FieldRaw, `{"v":{"a":1}}`},
-		{"raw array", ptrString(`[1,2,3]`), fmt.FieldRaw, `{"v":[1,2,3]}`},
-		{"raw empty", ptrString(""), fmt.FieldRaw, `{"v":null}`},
+		{"raw object", ptrString(`{"a":1}`), model.FieldRaw, `{"v":{"a":1}}`},
+		{"raw array", ptrString(`[1,2,3]`), model.FieldRaw, `{"v":[1,2,3]}`},
+		{"raw empty", ptrString(""), model.FieldRaw, `{"v":null}`},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			m := &mockFielder{
-				schema:   []fmt.Field{{Name: "v", Type: c.ft}},
+				schema:   []model.Field{{Name: "v", Type: c.ft}},
 				pointers: []any{c.ptr},
 			}
 			var out string
@@ -70,7 +71,7 @@ func TestEncodeFieldRaw(t *testing.T) {
 func TestEncodeRawOmitEmpty(t *testing.T) {
 	var raw string
 	m := &mockFielder{
-		schema:   []fmt.Field{{Name: "v", Type: fmt.FieldRaw, OmitEmpty: true}},
+		schema:   []model.Field{{Name: "v", Type: model.FieldRaw, OmitEmpty: true}},
 		pointers: []any{&raw},
 	}
 	var out string

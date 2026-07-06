@@ -1,8 +1,9 @@
 package tests
 
+import "github.com/tinywasm/model"
+
 import (
 	"github.com/tinywasm/json"
-	"github.com/tinywasm/fmt"
 	"testing"
 )
 
@@ -10,8 +11,8 @@ import (
 func TestDecodeStructNotFielder(t *testing.T) {
 	var s string = "initial"
 	m := &mockFielder{
-		schema: []fmt.Field{
-			{Name: "nested", Type: fmt.FieldStruct},
+		schema: []model.Field{
+			{Name: "nested", Type: model.FieldStruct},
 		},
 		pointers: []any{&s}, // string doesn't implement Fielder
 	}

@@ -2,6 +2,8 @@
 
 package main
 
+import "github.com/tinywasm/model"
+
 import (
 	"syscall/js"
 
@@ -15,11 +17,11 @@ type User struct {
 	Age   int64
 }
 
-func (u *User) Schema() []fmt.Field {
-	return []fmt.Field{
-		{Name: "name", Type: fmt.FieldText},
-		{Name: "email", Type: fmt.FieldText},
-		{Name: "age", Type: fmt.FieldInt},
+func (u *User) Schema() []model.Field {
+	return []model.Field{
+		{Name: "name", Type: model.FieldText},
+		{Name: "email", Type: model.FieldText},
+		{Name: "age", Type: model.FieldInt},
 	}
 }
 

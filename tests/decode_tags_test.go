@@ -1,16 +1,17 @@
 package tests
 
+import "github.com/tinywasm/model"
+
 import (
 	"github.com/tinywasm/json"
-	"github.com/tinywasm/fmt"
 	"testing"
 )
 
 func TestDecodeMissingField(t *testing.T) {
 	age := int64(20)
 	m := &mockFielder{
-		schema: []fmt.Field{
-			{Name: "age", Type: fmt.FieldInt},
+		schema: []model.Field{
+			{Name: "age", Type: model.FieldInt},
 		},
 		pointers: []any{&age},
 	}
@@ -26,8 +27,8 @@ func TestDecodeMissingField(t *testing.T) {
 func TestDecodeExtraField(t *testing.T) {
 	var name string
 	m := &mockFielder{
-		schema: []fmt.Field{
-			{Name: "name", Type: fmt.FieldText},
+		schema: []model.Field{
+			{Name: "name", Type: model.FieldText},
 		},
 		pointers: []any{&name},
 	}

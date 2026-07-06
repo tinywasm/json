@@ -1,8 +1,9 @@
 package tests
 
+import "github.com/tinywasm/model"
+
 import (
 	"github.com/tinywasm/json"
-	"github.com/tinywasm/fmt"
 	"testing"
 )
 
@@ -16,7 +17,7 @@ func TestParseIntoFielderNotObject(t *testing.T) {
 func TestSkipWhitespace(t *testing.T) {
 	var n int64
 	m := &mockFielder{
-		schema: []fmt.Field{{Name: "n", Type: fmt.FieldInt}},
+		schema:   []model.Field{{Name: "n", Type: model.FieldInt}},
 		pointers: []any{&n},
 	}
 	input := " \t\r\n{ \t\r\n\"n\" \t\r\n: \t\r\n42 \t\r\n} \t\r\n"

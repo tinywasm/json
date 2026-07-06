@@ -1,8 +1,8 @@
 package tests
 
 import (
-	"github.com/tinywasm/fmt"
 	"github.com/tinywasm/json"
+	"github.com/tinywasm/model"
 	"testing"
 )
 
@@ -13,7 +13,7 @@ type FontDef struct {
 }
 
 func (f *FontDef) IsNil() bool { return f == nil }
-func (f *FontDef) EncodeFields(w fmt.FieldWriter) {
+func (f *FontDef) EncodeFields(w model.FieldWriter) {
 	w.String("Name", f.Name)
 	if f.Cw != nil {
 		aw := w.Array("Cw", len(f.Cw))
@@ -27,7 +27,7 @@ func (f *FontDef) EncodeFields(w fmt.FieldWriter) {
 		w.Null("Cw")
 	}
 }
-func (f *FontDef) DecodeFields(r fmt.FieldReader) {
+func (f *FontDef) DecodeFields(r model.FieldReader) {
 	f.Name, _ = r.String("Name")
 	if ar, ok := r.Array("Cw"); ok {
 		n := ar.Len()

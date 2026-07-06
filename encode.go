@@ -1,5 +1,7 @@
 package json
 
+import "github.com/tinywasm/model"
+
 import (
 	"io"
 
@@ -87,7 +89,7 @@ func (w *jsonWriter) Raw(name, val string) {
 	w.b.WriteString(val)
 }
 
-func (w *jsonWriter) Object(name string, val fmt.Encodable) {
+func (w *jsonWriter) Object(name string, val model.Encodable) {
 	w.maybeComma()
 	w.writeKey(name)
 	if val == nil || val.IsNil() {
@@ -108,7 +110,7 @@ func (w *jsonWriter) Object(name string, val fmt.Encodable) {
 	putWriter(iw)
 }
 
-func (w *jsonWriter) Array(name string, n int) fmt.ArrayWriter {
+func (w *jsonWriter) Array(name string, n int) model.ArrayWriter {
 	w.maybeComma()
 	w.writeKey(name)
 	w.b.WriteByte('[')
@@ -163,7 +165,7 @@ func (w *jsonArrayWriter) Bytes(val []byte) {
 	w.b.WriteByte('"')
 }
 
-func (w *jsonArrayWriter) Object(val fmt.Encodable) {
+func (w *jsonArrayWriter) Object(val model.Encodable) {
 	w.maybeComma()
 	if val == nil || val.IsNil() {
 		w.b.WriteString("null")
@@ -189,7 +191,7 @@ func (w *jsonArrayWriter) Close() {
 
 // Encode serializes an Encodable to JSON.
 // output: *[]byte | *string | io.Writer.
-func Encode(data fmt.Encodable, output any) error {
+func Encode(data model.Encodable, output any) error {
 	b := fmt.GetConv()
 	defer b.PutConv()
 
@@ -200,10 +202,10 @@ func Encode(data fmt.Encodable, output any) error {
 		w.b = b
 		w.first = true
 
-		var slice fmt.FielderSlice
-		if s, ok := data.(interface{ FielderSlice() fmt.FielderSlice }); ok {
+		var slice model.FielderSlice
+		if s, ok := data.(interface{ FielderSlice() model.FielderSlice }); ok {
 			slice = s.FielderSlice()
-		} else if s, ok := data.(fmt.FielderSlice); ok {
+		} else if s, ok := data.(model.FielderSlice); ok {
 			slice = s
 		}
 
@@ -213,7 +215,7 @@ func Encode(data fmt.Encodable, output any) error {
 				if i > 0 {
 					b.WriteByte(',')
 				}
-				if it, ok := slice.At(i).(fmt.Encodable); ok {
+				if it, ok := slice.At(i).(model.Encodable); ok {
 					iw := getWriter()
 					iw.b = b
 					iw.first = true
