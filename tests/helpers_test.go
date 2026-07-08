@@ -117,9 +117,9 @@ func (m *mockFielder) EncodeFields(w model.FieldWriter) {
 			} else if p, ok := ptr.(*int32); ok {
 				w.Int(f.Name, int64(*p))
 			} else if p, ok := ptr.(*uint); ok {
-				w.Uint(f.Name, uint64(*p))
+				w.Int(f.Name, int64(*p))
 			} else if p, ok := ptr.(*uint64); ok {
-				w.Uint(f.Name, *p)
+				w.Int(f.Name, int64(*p))
 			}
 		case model.FieldFloat:
 			if p, ok := ptr.(*float64); ok {
