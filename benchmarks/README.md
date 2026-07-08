@@ -23,7 +23,7 @@ The `build.sh` script compiles the WASM binaries with different JSON implementat
 go run ./web/server.go
 ```
 
-You can then open `http://localhost:6060` in a browser to see the benchmark results.
+You can then open `http://localhost:8080` in a browser to see the benchmark results.
 
 ### Output
 
@@ -42,28 +42,32 @@ Both files implement the same functionality to ensure fair comparison.
 
 ## Performance Results
 
-Last updated: 2026-03-26
+Last updated: 2026-07-08
 
 ### Go Benchmark (`go test -bench`)
 
 | Benchmark | tinywasm/json | encoding/json | Δ allocs |
 |-----------|---------------|---------------|----------|
-| Encode    | 588 ns/op 80 B/op 1 allocs | 555 ns/op 80 B/op 1 allocs | 0 |
-| Decode    | 1050 ns/op 125 B/op 5 allocs | 2235 ns/op 376 B/op 8 allocs | -3 |
-| RoundTrip | 2004 ns/op 221 B/op 7 allocs | 2575 ns/op 376 B/op 8 allocs | -1 |
+| Encode    | 753.2 ns/op 80 B/op 1 allocs | 758.2 ns/op 80 B/op 1 allocs | 0 |
+| Decode    | 1414 ns/op 125 B/op 5 allocs | 3035 ns/op 376 B/op 8 allocs | -3 |
+| RoundTrip | 2459 ns/op 221 B/op 7 allocs | 3673 ns/op 376 B/op 8 allocs | -1 |
 
 > Run: `go test -bench=. -benchmem ./tests/...`
 
 ### WASM Binary Size
 
-| Implementation | Binary Size (WASM + Gzip) |
-| :--- | :--- |
-| **tinywasm/json** | **~27 KB** |
-| encoding/json (stdlib) | ~119 KB |
+Compiled with `tinygo build -target wasm -no-debug -opt=z`.
+
+| Implementation | Uncompressed | Gzipped |
+| :--- | :--- | :--- |
+| **tinywasm/json** | **51 KB** | **20 KB** |
+| encoding/json (stdlib) | 270 KB | 118 KB |
+
+> Run: `./build.sh` (tinywasm/json) and `./build.sh stlib` (stdlib) from this directory.
 
 ### Analysis
 
-**tinywasm/json is 77% smaller** (~27 KB vs ~119 KB) making it ideal for web apps where bundle size matters. By eliminating the `reflect` package, it not only significantly reduces the final WASM binary size, but also makes **decoding ~3.2x faster** and **roundtripping ~1.9x faster** than the standard library.
+**tinywasm/json is 83% smaller gzipped** (20 KB vs 118 KB) making it ideal for web apps where bundle size matters. By eliminating the `reflect` package, it not only significantly reduces the final WASM binary size, but also makes **decoding ~2.1x faster** and **roundtripping ~1.5x faster** than the standard library.
 
 **Use tinywasm/json when:** Bundle size and raw decoding performance are critical, or running in restricted WASM environments.
 **Use Stdlib when:** You need to work dynamically with arbitrary unknown schemas (like `map[string]any`), as tinywasm/json is optimized strictly for predefined structs (`fmt.Encodable`/`fmt.Decodable`).

@@ -82,12 +82,12 @@ Parses JSON into `data`.
 
 ## Benchmarks
 
-tinywasm/json is **77% smaller** than `encoding/json` in WASM (~27 KB vs ~119 KB), **zero-reflect**, and **0-allocation** on the serialization hot path.
+tinywasm/json is **83% smaller** than `encoding/json` in WASM (51 KB vs 270 KB, 20 KB vs 118 KB gzipped), **zero-reflect**, and **0-allocation** on the serialization hot path.
 
 | Benchmark | tinywasm/json | encoding/json | Δ allocs |
 |-----------|---------------|---------------|----------|
-| Encode    | 588 ns/op     | 555 ns/op     | 0        |
-| Decode    | 1050 ns/op    | 2235 ns/op    | -3       |
+| Encode    | 753 ns/op     | 758 ns/op     | 0        |
+| Decode    | 1414 ns/op    | 3035 ns/op    | -3       |
 
 See full results and analysis in [benchmarks/README.md](benchmarks/README.md).
 

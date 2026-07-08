@@ -7,7 +7,6 @@ import "github.com/tinywasm/model"
 import (
 	"syscall/js"
 
-	"github.com/tinywasm/fmt"
 	"github.com/tinywasm/json"
 )
 
@@ -17,16 +16,26 @@ type User struct {
 	Age   int64
 }
 
-func (u *User) Schema() []model.Field {
-	return []model.Field{
-		{Name: "name", Type: model.FieldText},
-		{Name: "email", Type: model.FieldText},
-		{Name: "age", Type: model.FieldInt},
+func (u *User) EncodeFields(w model.FieldWriter) {
+	w.String("name", u.Name)
+	w.String("email", u.Email)
+	w.Int("age", u.Age)
+}
+
+func (u *User) DecodeFields(r model.FieldReader) {
+	if v, ok := r.String("name"); ok {
+		u.Name = v
+	}
+	if v, ok := r.String("email"); ok {
+		u.Email = v
+	}
+	if v, ok := r.Int("age"); ok {
+		u.Age = v
 	}
 }
 
-func (u *User) Pointers() []any {
-	return []any{&u.Name, &u.Email, &u.Age}
+func (u *User) IsNil() bool {
+	return u == nil
 }
 
 func main() {
