@@ -14,8 +14,8 @@ type item struct {
 
 func (i *item) Schema() []model.Field {
 	return []model.Field{
-		{Name: "id", Type: model.FieldInt},
-		{Name: "name", Type: model.FieldText},
+		{Name: "id", Type: model.Int()},
+		{Name: "name", Type: model.Text()},
 	}
 }
 

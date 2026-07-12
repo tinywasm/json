@@ -10,9 +10,9 @@ import (
 func TestEncodeSimple(t *testing.T) {
 	m := &mockFielder{
 		schema: []model.Field{
-			{Name: "name", Type: model.FieldText},
-			{Name: "age", Type: model.FieldInt},
-			{Name: "active", Type: model.FieldBool},
+			{Name: "name", Type: model.Text()},
+			{Name: "age", Type: model.Int()},
+			{Name: "active", Type: model.Bool()},
 		},
 		pointers: []any{ptrString("Alice"), ptrInt64(30), ptrBool(true)},
 	}
@@ -31,7 +31,7 @@ func TestEncodeFielderError(t *testing.T) {
 
 func TestEncodeFieldBytesNonBytes(t *testing.T) {
 	m := &mockFielder{
-		schema:   []model.Field{{Name: "v", Type: model.FieldBlob}},
+		schema:   []model.Field{{Name: "v", Type: model.Blob()}},
 		pointers: []any{ptrInt(42)},
 	}
 	var out string
@@ -47,7 +47,7 @@ func TestEncodeFieldBytesNonBytes(t *testing.T) {
 func TestEncodeStringEscaping(t *testing.T) {
 	m := &mockFielder{
 		schema: []model.Field{
-			{Name: "msg", Type: model.FieldText},
+			{Name: "msg", Type: model.Text()},
 		},
 		pointers: []any{ptrString("hello \"world\"\n\r\t\\")},
 	}
@@ -64,7 +64,7 @@ func TestEncodeStringEscaping(t *testing.T) {
 func TestEncodeNilField(t *testing.T) {
 	m := &mockFielder{
 		schema: []model.Field{
-			{Name: "val", Type: model.FieldText},
+			{Name: "val", Type: model.Text()},
 		},
 		pointers: []any{nil},
 	}
@@ -81,7 +81,7 @@ func TestEncodeNilField(t *testing.T) {
 func TestEncodeBytes(t *testing.T) {
 	m := &mockFielder{
 		schema: []model.Field{
-			{Name: "data", Type: model.FieldBlob},
+			{Name: "data", Type: model.Blob()},
 		},
 		pointers: []any{ptrBytes([]byte("hello"))},
 	}
@@ -98,7 +98,7 @@ func TestEncodeBytes(t *testing.T) {
 func TestEncodeStructNotFielder(t *testing.T) {
 	m := &mockFielder{
 		schema: []model.Field{
-			{Name: "user", Type: model.FieldStruct},
+			{Name: "user", Type: model.Struct(nil)},
 		},
 		pointers: []any{ptrString("not-a-fielder")},
 	}
@@ -115,7 +115,7 @@ func TestEncodeStructNotFielder(t *testing.T) {
 func TestEncodeControlChars(t *testing.T) {
 	m := &mockFielder{
 		schema: []model.Field{
-			{Name: "msg", Type: model.FieldText},
+			{Name: "msg", Type: model.Text()},
 		},
 		pointers: []any{ptrString("\x01\x1f")},
 	}

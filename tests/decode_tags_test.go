@@ -11,7 +11,7 @@ func TestDecodeMissingField(t *testing.T) {
 	age := int64(20)
 	m := &mockFielder{
 		schema: []model.Field{
-			{Name: "age", Type: model.FieldInt},
+			{Name: "age", Type: model.Int()},
 		},
 		pointers: []any{&age},
 	}
@@ -28,7 +28,7 @@ func TestDecodeExtraField(t *testing.T) {
 	var name string
 	m := &mockFielder{
 		schema: []model.Field{
-			{Name: "name", Type: model.FieldText},
+			{Name: "name", Type: model.Text()},
 		},
 		pointers: []any{&name},
 	}

@@ -10,14 +10,14 @@ import (
 func TestEncodeNested(t *testing.T) {
 	inner := &mockFielder{
 		schema: []model.Field{
-			{Name: "city", Type: model.FieldText},
+			{Name: "city", Type: model.Text()},
 		},
 		pointers: []any{ptrString("Paris")},
 	}
 	outer := &mockFielder{
 		schema: []model.Field{
-			{Name: "user", Type: model.FieldText},
-			{Name: "address", Type: model.FieldStruct},
+			{Name: "user", Type: model.Text()},
+			{Name: "address", Type: model.Struct(nil)},
 		},
 		pointers: []any{ptrString("Alice"), inner},
 	}
@@ -62,9 +62,9 @@ func TestEncodeFieldRawRoundtrip(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			m := &mockFielder{
 				schema: []model.Field{
-					{Name: "jsonrpc", Type: model.FieldText},
-					{Name: "id", Type: model.FieldText},
-					{Name: "result", Type: model.FieldRaw, OmitEmpty: true},
+					{Name: "jsonrpc", Type: model.Text()},
+					{Name: "id", Type: model.Text()},
+					{Name: "result", Type: model.Raw(), OmitEmpty: true},
 				},
 				pointers: []any{ptrString(c.jsonrpc), ptrString(c.id), ptrString(c.result)},
 			}
@@ -82,8 +82,8 @@ func TestEncodeFieldRawRoundtrip(t *testing.T) {
 func TestEncodeOmitEmpty(t *testing.T) {
 	m := &mockFielder{
 		schema: []model.Field{
-			{Name: "name", Type: model.FieldText},
-			{Name: "age", Type: model.FieldInt, OmitEmpty: true},
+			{Name: "name", Type: model.Text()},
+			{Name: "age", Type: model.Int(), OmitEmpty: true},
 		},
 		pointers: []any{ptrString("Alice"), ptrInt64(0)},
 	}

@@ -12,7 +12,7 @@ func TestDecodeFromReader(t *testing.T) {
 	var name string
 	m := &mockFielder{
 		schema: []model.Field{
-			{Name: "name", Type: model.FieldText},
+			{Name: "name", Type: model.Text()},
 		},
 		pointers: []any{&name},
 	}
@@ -51,7 +51,7 @@ func TestDecodeFromBytes(t *testing.T) {
 	var name string
 	m := &mockFielder{
 		schema: []model.Field{
-			{Name: "name", Type: model.FieldText},
+			{Name: "name", Type: model.Text()},
 		},
 		pointers: []any{&name},
 	}

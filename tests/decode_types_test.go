@@ -11,7 +11,7 @@ func TestDecodeFloatFromInt(t *testing.T) {
 	var price float64
 	m := &mockFielder{
 		schema: []model.Field{
-			{Name: "price", Type: model.FieldFloat},
+			{Name: "price", Type: model.Float()},
 		},
 		pointers: []any{&price},
 	}
@@ -28,7 +28,7 @@ func TestDecodeFloatFromInt(t *testing.T) {
 func TestDecodeInt(t *testing.T) {
 	var v int
 	m := &mockFielder{
-		schema:   []model.Field{{Name: "v", Type: model.FieldInt}},
+		schema:   []model.Field{{Name: "v", Type: model.Int()}},
 		pointers: []any{&v},
 	}
 	if err := json.Decode(`{"v":42}`, m); err != nil {
@@ -57,7 +57,7 @@ func TestDecodeFieldRaw(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			var raw string
 			m := &mockFielder{
-				schema:   []model.Field{{Name: "v", Type: model.FieldRaw}},
+				schema:   []model.Field{{Name: "v", Type: model.Raw()}},
 				pointers: []any{&raw},
 			}
 			if err := json.Decode(c.input, m); err != nil {
@@ -74,7 +74,7 @@ func TestDecodeFieldRaw(t *testing.T) {
 func TestDecodeInt32(t *testing.T) {
 	var v int32
 	m := &mockFielder{
-		schema:   []model.Field{{Name: "v", Type: model.FieldInt}},
+		schema:   []model.Field{{Name: "v", Type: model.Int()}},
 		pointers: []any{&v},
 	}
 	if err := json.Decode(`{"v":42}`, m); err != nil {
@@ -89,7 +89,7 @@ func TestDecodeInt32(t *testing.T) {
 func TestDecodeFloat32(t *testing.T) {
 	var v float32
 	m := &mockFielder{
-		schema:   []model.Field{{Name: "v", Type: model.FieldFloat}},
+		schema:   []model.Field{{Name: "v", Type: model.Float()}},
 		pointers: []any{&v},
 	}
 	if err := json.Decode(`{"v":1.5}`, m); err != nil {
@@ -104,7 +104,7 @@ func TestDecodeFloat32(t *testing.T) {
 func TestDecodeInt32FromFloat(t *testing.T) {
 	var v int32
 	m := &mockFielder{
-		schema:   []model.Field{{Name: "v", Type: model.FieldInt}},
+		schema:   []model.Field{{Name: "v", Type: model.Int()}},
 		pointers: []any{&v},
 	}
 	if err := json.Decode(`{"v":42.0}`, m); err != nil {
@@ -119,7 +119,7 @@ func TestDecodeInt32FromFloat(t *testing.T) {
 func TestDecodeIntFromFloat(t *testing.T) {
 	var v int
 	m := &mockFielder{
-		schema:   []model.Field{{Name: "v", Type: model.FieldInt}},
+		schema:   []model.Field{{Name: "v", Type: model.Int()}},
 		pointers: []any{&v},
 	}
 	if err := json.Decode(`{"v":42.0}`, m); err != nil {
@@ -134,7 +134,7 @@ func TestDecodeIntFromFloat(t *testing.T) {
 func TestDecodeFloat32FromInt(t *testing.T) {
 	var v float32
 	m := &mockFielder{
-		schema:   []model.Field{{Name: "v", Type: model.FieldFloat}},
+		schema:   []model.Field{{Name: "v", Type: model.Float()}},
 		pointers: []any{&v},
 	}
 	if err := json.Decode(`{"v":42}`, m); err != nil {
@@ -149,7 +149,7 @@ func TestDecodeFloat32FromInt(t *testing.T) {
 func TestDecodeInt64Ptr(t *testing.T) {
 	var v int64
 	m := &mockFielder{
-		schema:   []model.Field{{Name: "v", Type: model.FieldInt}},
+		schema:   []model.Field{{Name: "v", Type: model.Int()}},
 		pointers: []any{&v},
 	}
 	if err := json.Decode(`{"v":42}`, m); err != nil {
@@ -164,7 +164,7 @@ func TestDecodeInt64Ptr(t *testing.T) {
 func TestDecodeInt64FromFloat(t *testing.T) {
 	var v int64
 	m := &mockFielder{
-		schema:   []model.Field{{Name: "v", Type: model.FieldInt}},
+		schema:   []model.Field{{Name: "v", Type: model.Int()}},
 		pointers: []any{&v},
 	}
 	if err := json.Decode(`{"v":42.0}`, m); err != nil {

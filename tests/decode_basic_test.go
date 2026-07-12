@@ -13,9 +13,9 @@ func TestDecodeSimple(t *testing.T) {
 	var active bool
 	m := &mockFielder{
 		schema: []model.Field{
-			{Name: "name", Type: model.FieldText},
-			{Name: "age", Type: model.FieldInt},
-			{Name: "active", Type: model.FieldBool},
+			{Name: "name", Type: model.Text()},
+			{Name: "age", Type: model.Int()},
+			{Name: "active", Type: model.Bool()},
 		},
 		pointers: []any{&name, &age, &active},
 	}
@@ -32,15 +32,15 @@ func TestDecodeNested(t *testing.T) {
 	var city string
 	inner := &mockFielder{
 		schema: []model.Field{
-			{Name: "city", Type: model.FieldText},
+			{Name: "city", Type: model.Text()},
 		},
 		pointers: []any{&city},
 	}
 	var user string
 	outer := &mockFielder{
 		schema: []model.Field{
-			{Name: "user", Type: model.FieldText},
-			{Name: "address", Type: model.FieldStruct},
+			{Name: "user", Type: model.Text()},
+			{Name: "address", Type: model.Struct(nil)},
 		},
 		pointers: []any{&user, inner},
 	}
@@ -57,7 +57,7 @@ func TestDecodeStringEscapes(t *testing.T) {
 	var msg string
 	m := &mockFielder{
 		schema: []model.Field{
-			{Name: "msg", Type: model.FieldText},
+			{Name: "msg", Type: model.Text()},
 		},
 		pointers: []any{&msg},
 	}
@@ -75,7 +75,7 @@ func TestDecodeNull(t *testing.T) {
 	name := "Alice"
 	m := &mockFielder{
 		schema: []model.Field{
-			{Name: "name", Type: model.FieldText},
+			{Name: "name", Type: model.Text()},
 		},
 		pointers: []any{&name},
 	}
@@ -92,7 +92,7 @@ func TestDecodeBytes(t *testing.T) {
 	var data []byte
 	m := &mockFielder{
 		schema: []model.Field{
-			{Name: "data", Type: model.FieldBlob},
+			{Name: "data", Type: model.Blob()},
 		},
 		pointers: []any{&data},
 	}

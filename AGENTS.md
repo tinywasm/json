@@ -58,4 +58,4 @@ gopush 'message'   # tests + tag + push + dependency bumps (NOT git commit/push 
 ## Related
 
 - [`tinywasm/fmt`](https://github.com/tinywasm/fmt) — `Conv`, `JSONEscape`, the codec contract.
-- [`tinywasm/orm`](https://github.com/tinywasm/orm) — `ormc` generates the models' typed methods.
+- [`tinywasm/ormc`](https://github.com/tinywasm/ormc) — `ormc` generates the models' typed methods.

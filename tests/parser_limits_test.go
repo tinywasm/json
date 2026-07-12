@@ -17,7 +17,7 @@ func TestParseIntoFielderNotObject(t *testing.T) {
 func TestSkipWhitespace(t *testing.T) {
 	var n int64
 	m := &mockFielder{
-		schema:   []model.Field{{Name: "n", Type: model.FieldInt}},
+		schema:   []model.Field{{Name: "n", Type: model.Int()}},
 		pointers: []any{&n},
 	}
 	input := " \t\r\n{ \t\r\n\"n\" \t\r\n: \t\r\n42 \t\r\n} \t\r\n"

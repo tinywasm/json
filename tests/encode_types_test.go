@@ -12,16 +12,16 @@ func TestEncodeNumericTypes(t *testing.T) {
 	cases := []struct {
 		name     string
 		ptr      any
-		ft       model.FieldType
+		ft       model.Kind
 		expected string
 	}{
-		{"int", ptrInt(5), model.FieldInt, `{"v":5}`},
-		{"int32", ptrInt32(5), model.FieldInt, `{"v":5}`},
-		{"int64", ptrInt64(5), model.FieldInt, `{"v":5}`},
-		{"float32", ptrFloat32(1.5), model.FieldFloat, `{"v":1.5}`},
-		{"float64", ptrFloat64(1.5), model.FieldFloat, `{"v":1.5}`},
-		{"uint", ptrUint(5), model.FieldInt, `{"v":5}`},
-		{"uint64", ptrUint64(5), model.FieldInt, `{"v":5}`},
+		{"int", ptrInt(5), model.Int(), `{"v":5}`},
+		{"int32", ptrInt32(5), model.Int(), `{"v":5}`},
+		{"int64", ptrInt64(5), model.Int(), `{"v":5}`},
+		{"float32", ptrFloat32(1.5), model.Float(), `{"v":1.5}`},
+		{"float64", ptrFloat64(1.5), model.Float(), `{"v":1.5}`},
+		{"uint", ptrUint(5), model.Int(), `{"v":5}`},
+		{"uint64", ptrUint64(5), model.Int(), `{"v":5}`},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -44,12 +44,12 @@ func TestEncodeFieldRaw(t *testing.T) {
 	cases := []struct {
 		name     string
 		ptr      any
-		ft       model.FieldType
+		ft       model.Kind
 		expected string
 	}{
-		{"raw object", ptrString(`{"a":1}`), model.FieldRaw, `{"v":{"a":1}}`},
-		{"raw array", ptrString(`[1,2,3]`), model.FieldRaw, `{"v":[1,2,3]}`},
-		{"raw empty", ptrString(""), model.FieldRaw, `{"v":null}`},
+		{"raw object", ptrString(`{"a":1}`), model.Raw(), `{"v":{"a":1}}`},
+		{"raw array", ptrString(`[1,2,3]`), model.Raw(), `{"v":[1,2,3]}`},
+		{"raw empty", ptrString(""), model.Raw(), `{"v":null}`},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -71,7 +71,7 @@ func TestEncodeFieldRaw(t *testing.T) {
 func TestEncodeRawOmitEmpty(t *testing.T) {
 	var raw string
 	m := &mockFielder{
-		schema:   []model.Field{{Name: "v", Type: model.FieldRaw, OmitEmpty: true}},
+		schema:   []model.Field{{Name: "v", Type: model.Raw(), OmitEmpty: true}},
 		pointers: []any{&raw},
 	}
 	var out string

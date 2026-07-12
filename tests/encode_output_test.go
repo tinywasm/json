@@ -11,7 +11,7 @@ import (
 
 func TestEncodeToBytes(t *testing.T) {
 	m := &mockFielder{
-		schema: []model.Field{{Name: "a", Type: model.FieldInt}},
+		schema: []model.Field{{Name: "a", Type: model.Int()}},
 		pointers: []any{ptrInt64(1)},
 	}
 	var out []byte
@@ -26,7 +26,7 @@ func TestEncodeToBytes(t *testing.T) {
 
 func TestEncodeToWriter(t *testing.T) {
 	m := &mockFielder{
-		schema: []model.Field{{Name: "a", Type: model.FieldInt}},
+		schema: []model.Field{{Name: "a", Type: model.Int()}},
 		pointers: []any{ptrInt64(1)},
 	}
 	var buf bytes.Buffer
@@ -42,7 +42,7 @@ func TestEncodeToWriter(t *testing.T) {
 // TestEncodeToString — output *string (ausente en tests originales)
 func TestEncodeToString(t *testing.T) {
 	m := &mockFielder{
-		schema: []model.Field{{Name: "a", Type: model.FieldInt}},
+		schema: []model.Field{{Name: "a", Type: model.Int()}},
 		pointers: []any{ptrInt64(1)},
 	}
 	var out string
@@ -58,7 +58,7 @@ func TestEncodeToString(t *testing.T) {
 // TestEncodeInvalidOutput — output desconocido → error
 func TestEncodeInvalidOutput(t *testing.T) {
 	m := &mockFielder{
-		schema: []model.Field{{Name: "a", Type: model.FieldInt}},
+		schema: []model.Field{{Name: "a", Type: model.Int()}},
 		pointers: []any{ptrInt64(1)},
 	}
 	if err := json.Encode(m, 123); err == nil {
@@ -74,7 +74,7 @@ func (e *errWriter) Write(p []byte) (n int, err error) {
 
 func TestEncodeWriterError(t *testing.T) {
 	m := &mockFielder{
-		schema: []model.Field{{Name: "v", Type: model.FieldText}},
+		schema: []model.Field{{Name: "v", Type: model.Text()}},
 		pointers: []any{ptrString("hello")},
 	}
 	if err := json.Encode(m, &errWriter{}); err == nil {

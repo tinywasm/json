@@ -21,7 +21,7 @@ func (m *mockFielder) IsNil() bool { return m == nil }
 func (m *mockFielder) DecodeFields(r model.FieldReader) {
 	for i, f := range m.schema {
 		ptr := m.pointers[i]
-		switch f.Type {
+		switch f.Type.Storage() {
 		case model.FieldText:
 			if p, ok := ptr.(*string); ok {
 				if val, ok := r.String(f.Name); ok {
@@ -98,7 +98,7 @@ func (m *mockFielder) EncodeFields(w model.FieldWriter) {
 		if f.OmitEmpty && isZero(ptr) {
 			continue
 		}
-		switch f.Type {
+		switch f.Type.Storage() {
 		case model.FieldText:
 			if p, ok := ptr.(*string); ok {
 				if p == nil {
