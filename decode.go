@@ -4,12 +4,16 @@ import "github.com/tinywasm/model"
 
 import (
 	"github.com/tinywasm/fmt"
-	"io"
 	"unsafe"
 )
 
+// Reader is io.Reader redeclared here, for the same reason as Writer.
+type Reader interface {
+	Read(p []byte) (n int, err error)
+}
+
 // Decode parses JSON into a Decodable.
-// input: []byte | string | io.Reader.
+// input: []byte | string | Reader.
 func Decode(input any, data model.Decodable) error {
 	if data == nil || data.IsNil() {
 		return fmt.Err("json", "decode", "destination is nil")
@@ -22,7 +26,7 @@ func Decode(input any, data model.Decodable) error {
 	case string:
 		// Avoid copy: parser is read-only, never modifies data.
 		raw = unsafe.Slice(unsafe.StringData(in), len(in))
-	case io.Reader:
+	case Reader:
 		var buf []byte
 		tmp := make([]byte, 4096)
 		for {
@@ -36,7 +40,7 @@ func Decode(input any, data model.Decodable) error {
 		}
 		raw = buf
 	default:
-		return fmt.Err("json", "decode", "input must be []byte, string, or io.Reader")
+		return fmt.Err("json", "decode", "input must be []byte, string, or json.Reader")
 	}
 
 	p := parser{data: raw}

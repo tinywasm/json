@@ -3,10 +3,14 @@ package json
 import "github.com/tinywasm/model"
 
 import (
-	"io"
-
 	"github.com/tinywasm/fmt"
 )
+
+// Writer is io.Writer redeclared here. Structurally identical, so any
+// io.Writer satisfies it without the caller changing a line.
+type Writer interface {
+	Write(p []byte) (n int, err error)
+}
 
 type jsonWriter struct {
 	b     *fmt.Conv
@@ -190,7 +194,7 @@ func (w *jsonArrayWriter) Close() {
 }
 
 // Encode serializes an Encodable to JSON.
-// output: *[]byte | *string | io.Writer.
+// output: *[]byte | *string | Writer.
 func Encode(data model.Encodable, output any) error {
 	b := fmt.GetConv()
 	defer b.PutConv()
@@ -252,11 +256,11 @@ func Encode(data model.Encodable, output any) error {
 		*out = cpy
 	case *string:
 		*out = b.GetString(fmt.BuffOut)
-	case io.Writer:
+	case Writer:
 		_, err := out.Write(b.Bytes())
 		return err
 	default:
-		return fmt.Err("json", "encode", "output must be *[]byte, *string, or io.Writer")
+		return fmt.Err("json", "encode", "output must be *[]byte, *string, or json.Writer")
 	}
 	return nil
 }
