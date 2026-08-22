@@ -14,8 +14,8 @@ type Reader interface {
 
 // Decode parses JSON into a Decodable.
 // input: []byte | string | Reader.
-func Decode[T model.Decodable](input any, data T) error {
-	if any(data) == nil || data.IsNil() {
+func Decode(input any, data model.Decodable) error {
+	if data == nil || data.IsNil() {
 		return fmt.Err("json", "decode", "destination is nil")
 	}
 
@@ -52,9 +52,9 @@ func Decode[T model.Decodable](input any, data T) error {
 	defer putReader(r)
 
 	var slice model.FielderSlice
-	if s, ok := any(data).(interface{ FielderSlice() model.FielderSlice }); ok {
+	if s, ok := data.(interface{ FielderSlice() model.FielderSlice }); ok {
 		slice = s.FielderSlice()
-	} else if s, ok := any(data).(model.FielderSlice); ok {
+	} else if s, ok := data.(model.FielderSlice); ok {
 		slice = s
 	}
 

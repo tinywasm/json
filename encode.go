@@ -195,11 +195,11 @@ func (w *jsonArrayWriter) Close() {
 
 // Encode serializes an Encodable to JSON.
 // output: *[]byte | *string | Writer.
-func Encode[T model.Encodable](data T, output any) error {
+func Encode(data model.Encodable, output any) error {
 	b := fmt.GetConv()
 	defer b.PutConv()
 
-	if any(data) == nil || data.IsNil() {
+	if data == nil || data.IsNil() {
 		b.WriteString("null")
 	} else {
 		w := getWriter()
@@ -207,9 +207,9 @@ func Encode[T model.Encodable](data T, output any) error {
 		w.first = true
 
 		var slice model.FielderSlice
-		if s, ok := any(data).(interface{ FielderSlice() model.FielderSlice }); ok {
+		if s, ok := data.(interface{ FielderSlice() model.FielderSlice }); ok {
 			slice = s.FielderSlice()
-		} else if s, ok := any(data).(model.FielderSlice); ok {
+		} else if s, ok := data.(model.FielderSlice); ok {
 			slice = s
 		}
 
